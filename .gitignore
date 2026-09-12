@@ -1,4 +1,7 @@
 node_modules/
+artifacts/
+bin/
+obj/
 成品/
 qa/
 Profiles/

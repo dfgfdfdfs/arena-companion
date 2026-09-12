@@ -4,7 +4,7 @@
 
 ## 下载与使用
 
-在本仓库右侧 **Releases** 中下载最新的 Windows x64 压缩包，完整解压后双击 `Arena筛选助手.exe`。不要只复制 exe，旁边的 DLL 和 assets 文件夹也需要保留。
+在本仓库右侧 **Releases** 中下载最新的 Windows x64 压缩包，完整解压后双击 `Arena筛选助手.exe`。不要只复制 exe，旁边的 DLL 和 assets 文件夹也需要保留。Release 同时提供完整源码压缩包；仓库首页本身也是全部源码。
 
 首次运行填写账号密码，密码至少 8 位，并包含一个大写字母和一个符号。分发版不附带默认密码或开发者账号。需要 Windows x64、.NET Framework 4.6.2 或以上，以及 Microsoft Edge WebView2 Runtime。
 
@@ -28,6 +28,8 @@
 
 ## 从源码构建
 
+源码根目录包含全部 `.cs`、窗体代码、网页资源、`ArenaCompanion.csproj`、`ArenaCompanion.sln`、实际构建脚本和打包脚本。窗体全部由 C# 代码创建，因此没有 Designer 或 `.resx`；具体文件对应关系及依赖版本见 [DEPENDENCIES.md](DEPENDENCIES.md)。
+
 在 Windows PowerShell 中运行：
 
 ```powershell
@@ -35,6 +37,12 @@
 ```
 
 输出位于 `成品` 文件夹。构建脚本使用 Windows 自带的 .NET Framework C# 编译器；所需 WebView2 SDK 文件已放在 `vendor/webview2`，版本为 `1.0.4191.47`。第三方许可和声明见该目录的 `LICENSE.txt` 与 `NOTICE.txt`。
+
+生成可执行压缩包、完整源码包和 SHA256 文件：
+
+```powershell
+./package-release.ps1 -Version v2026.09.12.1
+```
 
 ## 测试
 

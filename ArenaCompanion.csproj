@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" Condition="false" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{F7779D43-553B-4FD9-A72C-FF07799A4109}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>ArenaCompanion</RootNamespace>
+    <AssemblyName>Arena筛选助手</AssemblyName>
+    <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>ArenaCompanion.Program</StartupObject>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
+    <PlatformTarget>x64</PlatformTarget>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DebugType>pdbonly</DebugType>
+    <LangVersion>5</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>vendor\webview2\lib\net462\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.WinForms">
+      <HintPath>vendor\webview2\lib\net462\Microsoft.Web.WebView2.WinForms.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AccountReplacement.cs" />
+    <Compile Include="AccountSetup.cs" />
+    <Compile Include="AccountSetupDialog.cs" />
+    <Compile Include="AccountStore.cs" />
+    <Compile Include="AttachmentDialog.cs" />
+    <Compile Include="AttachmentUpload.cs" />
+    <Compile Include="AuthFlow.cs" />
+    <Compile Include="AuthPages.cs" />
+    <Compile Include="BrowserScript.cs" />
+    <Compile Include="CandidateCollector.cs" />
+    <Compile Include="CandidatePage.cs" />
+    <Compile Include="CandidateStore.cs" />
+    <Compile Include="ControlPipe.cs" />
+    <Compile Include="ConversationRecovery.cs" />
+    <Compile Include="ConversationWindow.cs" />
+    <Compile Include="GalleryWindow.cs" />
+    <Compile Include="HtmlImageRenderer.cs" />
+    <Compile Include="InstanceContext.cs" />
+    <Compile Include="InstancePicker.cs" />
+    <Compile Include="MainForm.AccountReplacement.cs" />
+    <Compile Include="MainForm.Control.cs" />
+    <Compile Include="MainForm.Gallery.cs" />
+    <Compile Include="MainForm.TaskSettings.cs" />
+    <Compile Include="MainForm.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="RateLimitTracker.cs" />
+    <Compile Include="ReplacementHandoff.cs" />
+    <Compile Include="RetryController.Cooldown.cs" />
+    <Compile Include="RetryController.cs" />
+    <Compile Include="SavedConversationStore.cs" />
+    <Compile Include="SavedConversationWindow.cs" />
+    <Compile Include="TaskSettings.cs" />
+    <Compile Include="WebPage.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="AuthBridge.js"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\AuthBridge.js</Link></Content>
+    <Content Include="CandidateBridge.js"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\CandidateBridge.js</Link></Content>
+    <Content Include="ConversationRecovery.js"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\ConversationRecovery.js</Link></Content>
+    <Content Include="PageBridge.js"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\PageBridge.js</Link></Content>
+    <Content Include="demo.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\demo.html</Link></Content>
+    <Content Include="gallery.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\gallery.html</Link></Content>
+    <Content Include="welcome.html"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>assets\welcome.html</Link></Content>
+    <Content Include="vendor\webview2\runtimes\win-x64\native\WebView2Loader.dll"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory><Link>WebView2Loader.dll</Link></Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
