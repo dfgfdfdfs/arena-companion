@@ -35,7 +35,8 @@ Copy-Item -LiteralPath (Join-Path $taskRoot 'vendor\webview2\LICENSE.txt') -Dest
 Copy-Item -LiteralPath (Join-Path $taskRoot 'vendor\webview2\NOTICE.txt') -Destination (Join-Path $taskStage '第三方许可\NOTICE.txt')
 
 Compress-Archive -LiteralPath $taskStage -DestinationPath $taskBinaryZip
-git -C $taskRoot archive --format=zip --prefix=('arena-companion-v'+$taskVersion+'-source/') --output=$taskSourceZip HEAD
+$taskArchiveArgs=@('archive','--format=zip',('--prefix=arena-companion-v'+$taskVersion+'-source/'),('--output='+$taskSourceZip),'HEAD')
+& git -C $taskRoot @taskArchiveArgs
 if($LASTEXITCODE -ne 0){throw '源码归档失败'}
 $taskLines=@($taskBinaryZip,$taskSourceZip)|ForEach-Object {(Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLower()+'  '+[IO.Path]::GetFileName($_)}
 $taskLines|Set-Content -LiteralPath $taskChecksums -Encoding utf8
