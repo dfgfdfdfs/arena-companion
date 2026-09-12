@@ -1,0 +1,12 @@
+{
+  "name": "arena-companion",
+  "version": "2026.9.12",
+  "private": true,
+  "description": "Windows desktop companion for Arena conversations and HTML candidate galleries",
+  "scripts": {
+    "test": "node --test AuthBridge.test.cjs PageBridge.test.cjs ConversationRecovery.test.cjs"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.13"
+  }
+}

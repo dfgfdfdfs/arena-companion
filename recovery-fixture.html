@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><main><div role="log">fixture</div><div contenteditable="true">保留用户草稿</div></main>
+<script>
+const session='01a09075-6027-7520-a0c8-d64be1b603f5',node='01a09096-19bc-709f-aaf3-8fdd293eda81';
+function resetCase(){
+ window.calls=0;
+ const initial=[{id:'first',role:'assistant',metadata:{feedback:{checkIn:'edit'}}},{id:'failed',role:'user',metadata:{error:{errorCategory:'provider_timeout'}}}];
+ const ghost={id:node,role:'assistant',metadata:{nodeId:node,checkpointApplied:true,pending:false},parts:[{type:'text',text:'临时回复 🌱'},{type:'tool-call',toolName:'fixture-only',result:'original tool evidence'}]};
+ window.live={id:session,status:'ready',messages:[...initial,ghost],agentFeedbackOperationLock:{activeOperation:null},setMessages(ms){calls++;this.messages=ms;},clearError(){}};
+ document.querySelector('[role=log]').__reactFiber_fixture={memoizedProps:{value:live},return:{memoizedProps:{initialMessages:initial}}};
+}
+resetCase();
+function triggerError(){return fetch('/api/chat/'+session+'/review-feedback',{method:'POST'});}
+</script>

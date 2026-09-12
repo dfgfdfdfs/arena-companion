@@ -1,0 +1,29 @@
+<!doctype html><meta charset="utf-8"><title>Offline collector fixture</title>
+<ul><li><a id="chat" href="/agent/11111111-1111-4111-8111-111111111111">Original local title</a><button aria-label="More options" id="more">More options</button></li></ul>
+<main><div role="log">Local completed response<button class="file">sample.html</button><button class="file">second.html</button></div><button id="download">Download file</button></main>
+<script>
+history.replaceState(null,'','/agent/11111111-1111-4111-8111-111111111111');
+let selected='sample.html';document.querySelectorAll('.file').forEach(b=>b.onclick=()=>selected=b.textContent);
+document.getElementById('download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<!doctype html><style>body{background:#245f51;color:white;font:32px sans-serif;display:grid;place-content:center;height:90vh}</style><h1>Collected '+selected+'</h1>'],{type:'text/html'}));a.download=selected;a.click();};
+window.captionedArtifact=()=>{
+ document.querySelectorAll('.file')[1].remove();const b=document.querySelector('.file');b.textContent='查看 HTML 文件';
+ b.onclick=()=>{selected='sample.html';if(document.getElementById('switch'))return;const s=document.createElement('button');s.id='switch';s.setAttribute('aria-label','Switch file');s.textContent='sample.html';document.querySelector('main').append(s);const f=document.createElement('iframe');f.title='HTML preview';document.querySelector('main').append(f);};
+};
+window.dualPreviewArtifact=()=>{
+ document.querySelector('[role=log]').innerHTML='Completed HTML response';
+ const row=document.createElement('div');row.setAttribute('role','button');
+ row.innerHTML='<span>Write <span>sample.html</span></span><button aria-label="Open file">open</button>';
+ document.querySelector('[role=log]').append(row);
+ row.querySelector('button').onclick=()=>{selected='sample.html';document.getElementById('switch').textContent=selected;window.openClicks=(window.openClicks||0)+1;};
+ const inline=document.createElement('iframe');inline.title='File preview';inline.srcdoc='<h1>Inline preview</h1>';document.querySelector('[role=log]').append(inline);
+};
+window.closedPreviewArtifact=()=>{
+ document.querySelectorAll('iframe').forEach(e=>e.remove());document.getElementById('switch').remove();
+ const row=document.querySelector('[role=log] [role=button]');row.querySelector('button').onclick=()=>{selected='sample.html';window.openClicks=(window.openClicks||0)+1;const s=document.createElement('button');s.id='switch';s.setAttribute('aria-label','Switch file');s.textContent=selected;document.querySelector('main').append(s);const f=document.createElement('iframe');f.title='HTML preview';document.querySelector('main').append(f);};
+ const other=document.createElement('div');other.setAttribute('role','button');other.innerHTML='<span>notes.txt</span><button aria-label="Open file">open</button>';other.querySelector('button').onclick=()=>{throw Error('Wrong non-HTML file selected');};document.querySelector('[role=log]').append(other);
+};
+document.getElementById('more').onpointerdown=()=>{
+ const menu=document.createElement('div');menu.setAttribute('role','menu');const item=document.createElement('div');item.setAttribute('role','menuitem');item.textContent='Rename';menu.append(item);document.body.append(menu);
+ item.onclick=()=>{menu.remove();const d=document.createElement('div');d.setAttribute('role','dialog');d.innerHTML='<h2>Rename chat</h2><input><button>Rename</button>';document.body.append(d);d.querySelector('button').onclick=()=>{document.getElementById('chat').textContent=d.querySelector('input').value;d.remove()};};
+};
+</script>

@@ -1,0 +1,19 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>离线演示 · Arena 筛选助手</title>
+<style>body{font:16px/1.7 "Microsoft YaHei",system-ui;margin:0;color:#213752;background:#f8fafd}header{padding:20px 30px;background:white;border-bottom:1px solid #d9e3ef}a,button{cursor:pointer;border:1px solid #c9d9ee;border-radius:8px;color:#245eaa;background:white;padding:9px 16px;font:inherit;text-decoration:none;margin-right:8px}main{padding:30px;max-width:850px;margin:auto}[role=log]{min-height:230px}article{padding:24px;background:white;border:1px solid #d8e3f1;border-radius:12px;margin:16px 0}.hint{color:#6e8198}h1{font-size:28px}#editor{padding:15px;background:white;border:1px solid #bdd0e8;border-radius:10px;min-height:65px;margin:20px 0}#editor:empty:before{content:'软件会在这里自动填入提示词';color:#8b9db3}[role=dialog]{position:fixed;inset:20% 15%;background:white;padding:40px;box-shadow:0 0 0 100vw #10203090;border-radius:20px}select{font:inherit;padding:5px;max-width:250px}</style>
+<header><b>离线演示</b> · 不连接网站，不消耗额度<br><a href="/agent" id="new">New Chat</a><a href="/c/old" id="old">New Chat</a><small class="hint">第二个链接模拟历史同名会话</small></header>
+<main><h1>先试用，再正式开始</h1><p>在左侧点“开始筛选”，软件会先排除 Thinking，再停在第二次候选。</p>
+<label>演示情况：<select id="scenario"><option value="normal">第 1 次 Thinking，第 2 次候选</option><option value="always">每次都 Thinking（测试持续重试）</option><option value="captcha">需要手动验证</option><option value="slow">一直等待（可测试暂停）</option><option value="rate">网站限流</option></select></label>
+<div role="log"></div><div id="editor" contenteditable="true"></div><button aria-label="Send message" id="send" disabled>发送</button><button aria-label="Stop generating" id="stop" hidden>停止生成</button></main>
+<script>
+history.replaceState(null,'','/agent');let attempt=0,generation=0;const log=document.querySelector('[role=log]'),editor=document.getElementById('editor'),send=document.getElementById('send'),stop=document.getElementById('stop');
+editor.addEventListener('input',()=>send.disabled=!editor.innerText.trim());
+document.getElementById('new').onclick=e=>{e.preventDefault();generation++;history.pushState(null,'','/agent');log.replaceChildren();editor.textContent='';send.disabled=true;stop.hidden=true;};
+document.getElementById('old').onclick=e=>{e.preventDefault();log.textContent='错误：点击了历史同名会话';};
+stop.onclick=()=>{generation++;stop.hidden=true;send.disabled=true;const p=document.createElement('p');p.textContent='Stopped';log.append(p);};
+send.onclick=()=>{
+ const prompt=editor.innerText.trim();if(!prompt)return;attempt++;const token=++generation;history.pushState(null,'','/agent/demo-'+attempt);log.replaceChildren();const p=document.createElement('p');p.textContent=prompt;log.append(p);editor.textContent='';send.disabled=true;stop.hidden=false;
+ const selected=document.getElementById('scenario').value;
+ const emit=()=>{if(token!==generation)return;const card=document.createElement('article');if(selected==='always'||(selected==='normal'&&attempt===1)){const b=document.createElement('button');b.textContent='Thinking...';b.setAttribute('aria-expanded','true');card.append(b);card.append(' 这次模拟回答有 Thinking，软件会换下一次。');log.append(card);}else if(selected==='slow'){card.textContent='waiting';log.append(card);}else if(selected==='rate'){card.setAttribute('role','alert');card.textContent='Too many requests. Try again later.';log.append(card);}else{card.textContent='演示候选：这次回答没有 Thinking。这里模拟已完成的火柴人大战页面；软件会观察一会儿，再显示找到候选。';log.append(card);stop.hidden=true;}};
+ if(selected==='captcha'){const dialog=document.createElement('div');dialog.setAttribute('role','dialog');dialog.innerHTML='<h2>Security Verification</h2><p>这是离线模拟验证，不是真实验证码。点击下面按钮，再点软件左侧“继续”。</p><button>我已完成模拟验证</button>';dialog.querySelector('button').onclick=()=>{dialog.remove();emit();};document.body.append(dialog);}else setTimeout(emit,2200);
+};
+</script></html>

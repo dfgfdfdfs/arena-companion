@@ -1,0 +1,36 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>Arena 候选图集</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f3ee;color:#26342f;font:13px system-ui,"Microsoft YaHei",sans-serif}header{padding:18px 22px 14px;background:#fffef9;border-bottom:1px solid #dedfd7;position:sticky;top:0;z-index:2}h1{font-size:23px;margin:0 0 6px}header p{color:#67726a;margin:0;line-height:1.7}.tools{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}select,.tools button{background:white;border:1px solid #d4d9d1;padding:6px 9px;border-radius:6px;color:#26342f;cursor:pointer}#destination{max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#748076;font-size:12px}#count{margin-left:auto;color:#587661}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;padding:18px 22px;align-items:start}.card{min-width:0;background:#fffef9;border:2px solid transparent;border-radius:8px;overflow:hidden;box-shadow:0 1px 7px #26342f0d}.card.selected{border-color:#3a8060;box-shadow:0 0 0 2px #3a80602b}.image-link{border:0;padding:0;display:block;width:100%;cursor:pointer;background:#e8ebe6}.image-link:focus-visible{outline:3px solid #5b9679;outline-offset:-3px}.image-link img{width:100%;height:auto;display:block}.meta{padding:8px}.title{font-size:12px;font-weight:650;margin-bottom:5px}.detail{color:#748076;font-size:10px;line-height:1.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.foot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10px;color:#77867c}.zoom{cursor:pointer;background:#edf2eb;border:0;border-radius:4px;padding:4px 6px;color:#47604f;font-size:10px}.pending{color:#a36421;margin-top:5px;font-size:10px}#empty{padding:70px 25px;text-align:center;color:#758478;line-height:2}dialog{border:0;padding:0;max-width:96vw;max-height:94vh;background:#17201b;border-radius:10px}dialog::backdrop{background:#15251bd9}dialog img{max-width:90vw;display:block}dialog button{position:sticky;top:12px;float:right;margin:12px;border:0;border-radius:30px;padding:10px 15px;cursor:pointer}#menu{position:fixed;z-index:10;width:215px;padding:5px;background:#fffef9;border:1px solid #d8dfd6;border-radius:9px;box-shadow:0 9px 30px #15251b30}#menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:#26342f;padding:10px;border-radius:5px;cursor:pointer}#menu button:hover,#menu button:focus{background:#e8eee6}#menu [data-action=discard]{color:#a34435}#notice{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);max-width:85vw;padding:12px 18px;background:#263f31;color:white;border-radius:8px;z-index:20;white-space:pre-wrap}#notice:empty{display:none}
+</style>
+<header><h1>候选图集</h1><p>左键选中图片，右键打开菜单：转到原对话、保存账号与对话，或丢弃图片。</p><div class="tools"><label>图片大小 <select id="size"><option value="110">极小图</option><option value="140" selected>小图 · 更多同屏</option><option value="220">中图</option><option value="320">大图</option></select></label><button id="choose">保存位置…</button><span id="destination">桌面</span><span id="count">等待候选</span></div></header>
+<div id="empty">还没有候选图片。回答完成且未观察到 Thinking 后，软件会自动收集。</div><main class="grid" id="grid"></main>
+<div id="menu" role="menu" hidden><button role="menuitem" data-action="open">转到对应对话</button><button role="menuitem" data-action="save">保存账号与对话</button><button role="menuitem" data-action="discard">丢弃该图</button></div><div id="notice" role="status"></div>
+<dialog id="large"><button id="close">关闭</button><img alt="候选大图" id="largeImage"></dialog>
+<script>
+const grid=document.getElementById('grid'),large=document.getElementById('large'),menu=document.getElementById('menu');
+const post=data=>window.chrome.webview.postMessage(data),el=(tag,cls,text)=>{const e=document.createElement(tag);e.className=cls;if(text)e.textContent=text;return e};
+let selected=null,noticeTimer;
+function select(card){document.querySelectorAll('.selected').forEach(e=>e.classList.remove('selected'));card.classList.add('selected');selected={id:card.dataset.id,file:card.dataset.file};}
+function context(card,x,y){select(card);menu.hidden=false;menu.style.left=Math.max(0,Math.min(x,innerWidth-225))+'px';menu.style.top=Math.max(0,Math.min(y,innerHeight-145))+'px';}
+window.chrome.webview.addEventListener('message',({data})=>{
+ if(data.notice){document.getElementById('notice').textContent=data.notice;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>document.getElementById('notice').textContent='',9000);return;}
+ if(data.destination){document.getElementById('destination').textContent=data.destination;document.getElementById('destination').title=data.destination;}
+ const records=Array.isArray(data)?data:data.records;if(!records)return;
+ menu.hidden=true;grid.replaceChildren();let images=0,conversations=0;
+ for(const record of records){if(record.Images.length)conversations++;for(const image of record.Images){
+  images++;const card=el('article','card');card.dataset.id=record.Id;card.dataset.file=image.File;
+  const link=el('button','image-link');link.title='左键选中，右键菜单';link.onclick=()=>{menu.hidden=true;select(card)};
+  card.oncontextmenu=e=>{e.preventDefault();context(card,e.clientX,e.clientY)};
+  link.onkeydown=e=>{if(e.key==='ContextMenu'||(e.shiftKey&&e.key==='F10')){e.preventDefault();const r=link.getBoundingClientRect();context(card,r.left+10,r.top+10)}};
+  const img=el('img','');img.src='https://arena-gallery-images.local/'+encodeURIComponent(image.File);img.alt=record.Title+' · '+image.Name;link.append(img);
+  const meta=el('div','meta');meta.append(el('div','title',record.Title),el('div','detail',image.Name+' · '+image.Width+' × '+image.Height),el('div','detail',record.Email));
+  if(!record.Renamed)meta.append(el('div','pending','原对话重命名待重试'));
+  const foot=el('div','foot');foot.append(el('span','','右键菜单'));const zoom=el('button','zoom','放大');zoom.onclick=()=>{document.getElementById('largeImage').src=img.src;large.showModal()};foot.append(zoom);meta.append(foot);card.append(link,meta);grid.append(card);
+  if(selected&&selected.id===record.Id&&selected.file===image.File)select(card);
+ }}
+ document.getElementById('empty').hidden=images>0;document.getElementById('count').textContent=conversations+' 条对话 / '+images+' 张图片';
+});
+menu.onclick=e=>{const action=e.target.dataset.action;if(action&&selected){post({action,...selected});menu.hidden=true}};
+document.addEventListener('click',e=>{if(!menu.contains(e.target))menu.hidden=true});document.addEventListener('keydown',e=>{if(e.key==='Escape')menu.hidden=true});window.addEventListener('scroll',()=>menu.hidden=true);
+document.getElementById('size').onchange=e=>grid.style.gridTemplateColumns='repeat(auto-fill,minmax('+e.target.value+'px,1fr))';document.getElementById('close').onclick=()=>large.close();document.getElementById('choose').onclick=()=>post({action:'choose'});
+</script></html>
