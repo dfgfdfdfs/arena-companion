@@ -1,62 +1,67 @@
 # Arena 筛选助手
 
-适用于 Windows 的 Arena 桌面辅助工具，使用 C#、WinForms 和 WebView2。
+这是 Windows 桌面版源码。它为每个实例保存独立的 Arena 浏览器资料与账号状态，可自动提交任务、识别回答状态、收集回答中的 HTML 并渲染为候选图集。
 
-## 下载与使用
+## 当前功能
 
-在本仓库右侧 **Releases** 中下载最新的 Windows x64 压缩包，完整解压后双击 `Arena筛选助手.exe`。不要只复制 exe，旁边的 DLL 和 assets 文件夹也需要保留。Release 同时提供完整源码压缩包；仓库首页本身也是全部源码。
+- 多实例：创建、重命名、删除实例；各实例使用独立浏览器资料和账号。
+- 首次使用：独立分发版不带默认密码。新实例要求输入两次密码，密码至少 8 位，并包含一个大写字母和一个符号。
+- 任务设置：保存提示词和附件副本，切换账号后继续沿用。
+- 候选图集：自动收集完成回答里的 HTML，渲染完整 PNG；可选择、丢弃、保存账号与对话，并从保存入口返回原对话。
+- 会话恢复：识别 `Assistant node ... not found in session ...`，核对状态并备份后恢复可输入会话。
+- 限流处理：识别 429 后切换到账号页并触发无副作用的“测试”按钮，日志保留检测结果。
+- 网络信息：在账号页每 5 秒读取当前 v2rayN 节点、服务器地址、解析 IP、延迟和公网出口；“切换到下一个不同 IP”只在用户点击时执行。
+- 本机接口：使用仅当前 Windows 用户可访问的命名管道，不开放 HTTP 端口。
 
-首次运行填写账号密码，密码至少 8 位，并包含一个大写字母和一个符号。分发版不附带默认密码或开发者账号。需要 Windows x64、.NET Framework 4.6.2 或以上，以及 Microsoft Edge WebView2 Runtime。
+## 构建
 
-觉得有用可以点击页面右上角 **Star**；问题和建议可提交到 **Issues**。
-
-## 功能
-
-- 多实例保存独立账号、浏览器资料和任务设置。
-- 自定义提示词，绑定附件后自动用于后续任务；默认无需附件。
-- 根据页面实际显示的 Thinking / Thought 状态筛选回答。未观察到 Thinking 不代表确定使用了某个模型。
-- 回答完成后读取 HTML，渲染成候选图片，并与原账号、原对话关联。
-- 图集支持比较图片、右键打开原对话、丢弃图片和保存会话入口。
-- 遇到已确认的 HTTP 429 限流后，等待约 5 秒重试原问题。新限流回复更新网站提示的倒计时，提交成功后继续任务。页面和附件检查可能使间隔略长。
-- 对符合特定状态的 `Assistant node ... not found in session ...` 错误，先保留恢复备份，再修复本地会话状态。
-
-手动暂停会停止自动重试。遇到人机验证、登录失效、用户修改草稿或提交结果不明时保留现场，避免重复提交。网站界面或接口变化可能需要适配。
-
-## 本地数据
-
-独立分发版默认将数据保存在 `%LOCALAPPDATA%\Arena筛选助手独立版`。密码使用 Windows 当前用户的 DPAPI 加密；账号、浏览器资料、附件和候选图片均保存在本机，不包含在此仓库和分发包中。
-
-## 从源码构建
-
-源码根目录包含全部 `.cs`、窗体代码、网页资源、`ArenaCompanion.csproj`、`ArenaCompanion.sln`、实际构建脚本和打包脚本。窗体全部由 C# 代码创建，因此没有 Designer 或 `.resx`；具体文件对应关系及依赖版本见 [DEPENDENCIES.md](DEPENDENCIES.md)。
-
-在 Windows PowerShell 中运行：
+系统要求：Windows x64、.NET Framework 4.6.2 或更高兼容版本，以及 Microsoft Edge WebView2 Runtime。
 
 ```powershell
-./build.ps1
+.\build.ps1 -NoDefaultPassword
 ```
 
-输出位于 `成品` 文件夹。构建脚本使用 Windows 自带的 .NET Framework C# 编译器；所需 WebView2 SDK 文件已放在 `vendor/webview2`，版本为 `1.0.4191.47`。第三方许可和声明见该目录的 `LICENSE.txt` 与 `NOTICE.txt`。
-
-生成可执行压缩包、完整源码包和 SHA256 文件：
-
-```powershell
-./package-release.ps1 -Version v2026.09.12.1
-```
+输出位于 `成品\Arena筛选助手.exe`。仓库包含编译所需的 WebView2 SDK 文件，因此主程序构建不需要联网恢复 NuGet 包。也可以在 Visual Studio 中打开 `ArenaCompanion.sln`，使用 `Release | x64` 构建。
 
 ## 测试
 
-JavaScript 测试需要 Node.js：
+DOM 测试需要 Node.js 18 或更高版本：
 
 ```powershell
 npm ci
-npm test
-./test.ps1
-./test-cooldown.ps1
-./test-gallery.ps1
-./test-recovery.ps1
+.\test.ps1
+.\test-gallery.ps1
+.\test-recovery.ps1
+.\test-cooldown.ps1
+.\test-instance-manager.ps1
+.\test-multi.ps1
+.\test-network.ps1
 ```
 
-先执行 `build.ps1`，再运行 WebView 测试。这些测试使用本地测试页面，不会注册 Arena 账号或向 Arena 发送生成请求。测试输出放在 `qa`，不会提交到仓库。
+这些测试使用本地夹具，不需要真实 Arena 账号。网站界面变化仍可能需要更新选择器。
 
-本次版本包含读取通道并发修复、HTML 双入口识别修复，以及五秒限流重试。验证范围见 [VALIDATION.md](VALIDATION.md)。
+## 打包独立分发版
+
+```powershell
+.\package-distribution.ps1
+```
+
+脚本始终使用 `-NoDefaultPassword` 构建，并检查分发目录中不存在 `account.dpapi`。可选的 v2rayN 控制组件会从官方 `2dust/v2rayN` 的 `7.12.7` 标签构建，不覆盖正在运行的 v2rayN。
+
+发布源码包和独立版压缩包：
+
+```powershell
+.\package-release.ps1 -Version v2026.09.12.2
+```
+
+## v2rayN 控制桥
+
+`v2rayn-bridge` 保存针对 v2rayN 7.12.7 的新增源码与最小补丁。桥只暴露同一 Windows 用户下的命名管道，返回节点显示信息并调用 v2rayN 自身的活动配置切换及核心重载逻辑，不返回订阅地址、UUID 或密码。
+
+该组件基于 GPL-3.0 的 v2rayN。构建和分发时会包含对应的完整修改源码。详见 `v2rayn-bridge/README.md`。
+
+## 数据位置
+
+运行数据默认位于 `%LOCALAPPDATA%\Arena筛选助手`，包括实例资料、任务设置和候选图集。账号密码使用当前 Windows 用户的 DPAPI 加密。仓库和源码压缩包不包含账号、密码、浏览器资料、候选图、测试日志或 EXE。
+
+详细依赖见 `DEPENDENCIES.md`，验证范围见 `VALIDATION.md`。

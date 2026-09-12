@@ -43,8 +43,9 @@ namespace ArenaCompanion {
             Check(c.Attempt==2&&p.Actions.Contains("stop")&&p.Actions.Contains("new"),"thinking triggers stop, new, refill, send");
             p.V.thinking=true;Steps(c,5);Check(c.Finished&&c.Rejected==2&&c.Attempt==2,"attempt cap excludes both thinking replies");
             p=new FakePage();p.V.blocker="需要人机验证";c=new RetryController(p);c.Start("hello",2,true);Steps(c,1);
-            Check(!c.Running&&p.Actions.Count==0,"captcha pauses before writes");
-            p.V.blocker="";c.Resume();Steps(c,3);Check(c.Attempt==1,"resume continues after captcha");
+            Check(!c.Running&&c.WaitingForVerification&&p.Actions.Count==0,"captcha pauses before writes and remains read-only observable");
+            Steps(c,3);Check(p.Actions.Count==0,"captcha polling never writes to the page");
+            p.V.blocker="";Steps(c,4);Check(c.Running&&c.Attempt==1,"cleared captcha automatically resumes preserved progress");
             p=new FakePage();p.V.draft="someone else's draft";c=new RetryController(p);c.Start("hello",2,true);Steps(c,2);
             Check(!c.Running&&p.Actions.Count==0&&p.V.draft!="hello","preserves unrelated draft");
             p=new FakePage();p.AmbiguousSend=true;c=new RetryController(p);c.Start("hello",2,true);Steps(c,3);c.Resume();Steps(c,2);
@@ -125,22 +126,15 @@ namespace ArenaCompanion {
         static void CooldownWorkflow() {
             var now=DateTime.UtcNow;var p=new FakePage();var c=new RetryController(p,()=>now);c.Start("hello",1,false);Steps(c,3);
             p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.url="https://arena.ai/agent";p.V.draft="hello";p.V.rateLimitId=1;p.V.rateLimitRetryAt=now.AddSeconds(640);Steps(c,1);
-            Check(c.Phase=="cooldown"&&c.Running&&c.CooldownSeconds==640,"429 enters visible countdown using server wait time");
-            now=now.AddSeconds(4);Steps(c,3);Check(c.Running&&c.CooldownSeconds==636&&p.Actions.FindAll(a=>a=="send").Count==1,"server countdown decreases locally without submitting before five seconds");
-            now=now.AddSeconds(1);Steps(c,3);Check(c.Running&&c.Attempt==1&&p.Actions.FindAll(a=>a=="send").Count==2,"five seconds automatically retries once before the server deadline");
-            p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.draft="hello";p.V.url="https://arena.ai/agent";p.V.rateLimitId=2;p.V.rateLimitRetryAt=now.AddSeconds(12);Steps(c,1);
-            Check(c.Phase=="cooldown"&&c.CooldownSeconds==12,"another 429 replaces countdown with the new server time");
-            c.Pause("manual");now=now.AddSeconds(13);Steps(c,5);Check(p.Actions.FindAll(a=>a=="send").Count==2,"manual pause prevents automatic retry after countdown expires");
-            c.Resume();p.V.draft="changed by user";Steps(c,1);Check(!c.Running&&p.V.draft=="changed by user"&&p.Actions.FindAll(a=>a=="send").Count==2,"changed draft is retained rather than overwritten at recovery");
+            Check(c.Phase=="cooldown"&&!c.Running&&c.Finished&&c.CooldownSeconds==0,"429 stops the current task without a countdown");
+            Check(c.Message.Contains("不会倒计时或自动重试"),"429 explains that retry has been disabled");
+            int sends=p.Actions.FindAll(a=>a=="send").Count;now=now.AddMinutes(30);Steps(c,20);
+            Check(p.Actions.FindAll(a=>a=="send").Count==sends,"stopped 429 never submits again after time passes");
+            c.Resume();Steps(c,10);Check(!c.Running&&p.Actions.FindAll(a=>a=="send").Count==sends,"continue cannot restart a finished rate-limited round");
             p=new FakePage();c=new RetryController(p,()=>now);c.Start("hello",0,false);Steps(c,3);p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.url="https://arena.ai/agent";p.V.rateLimitId=1;Steps(c,1);
-            Check(c.Running&&c.Phase=="cooldown"&&c.Message.Contains("未提供恢复时间"),"429 without retry time keeps five-second retry without inventing a server deadline");
-            p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.url="https://arena.ai/agent";now=now.AddSeconds(5);Steps(c,3);
-            Check(p.Actions.FindAll(a=>a=="send").Count==2,"missing Retry-After still permits one five-second retry");
-            now=now.AddSeconds(60);Steps(c,5);Check(p.Actions.FindAll(a=>a=="send").Count==2,"successful request is not sent again by the old retry schedule");
-            p=new FakePage();c=new RetryController(p,()=>now);c.Start("hello",0,false);Steps(c,3);p.V.rateLimitId=1;p.V.rateLimitRetryAt=now.AddSeconds(60);Steps(c,1);
-            now=now.AddSeconds(5);Steps(c,3);Check(p.Actions.FindAll(a=>a=="send").Count==1&&c.Phase=="observe","visible accepted conversation cancels rate-limit retry without duplicate submission");
-            p=new FakePage();p.V.rateLimitId=1;p.V.rateLimitRetryAt=now.AddSeconds(30);c=new RetryController(p,()=>now);c.Start("hello",0,false);Steps(c,1);c.Pause("manual");c.Start("hello",0,false);Steps(c,1);
-            Check(c.Phase=="cooldown"&&p.Actions.Count==0,"restarting a run still honors the saved future cooldown");
+            Check(!c.Running&&c.Finished&&c.CooldownSeconds==0,"429 without Retry-After also stops without a countdown");
+            sends=p.Actions.FindAll(a=>a=="send").Count;now=now.AddMinutes(30);Steps(c,20);
+            Check(p.Actions.FindAll(a=>a=="send").Count==sends,"429 without Retry-After never schedules a retry");
         }
         static void UnlimitedRounds() {
             var now=DateTime.UtcNow;var p=new FakePage();var c=new RetryController(p,()=>now);

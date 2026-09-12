@@ -26,7 +26,11 @@ namespace ArenaCompanion {
         public void EnsurePassword(string defaultsDirectory = null) {
             AccountData account=Load();
             if(!String.IsNullOrEmpty(account.Password))return;
-            throw new InvalidOperationException("请先填写账号密码；独立分发版不提供默认密码");
+            string directory=defaultsDirectory??Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","account-defaults");
+            AccountData defaults=new AccountStore(directory).Load();
+            if(String.IsNullOrEmpty(defaults.Password))throw new InvalidOperationException("软件的默认账号配置缺失，请保留完整软件文件夹");
+            account.Password=defaults.Password;
+            Save(account);
         }
         public void Save(AccountData account) {
             byte[] bytes = Encoding.UTF8.GetBytes(new JavaScriptSerializer().Serialize(account));

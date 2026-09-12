@@ -50,6 +50,7 @@ namespace ArenaCompanion {
         public string Phase { get; private set; }
         public string Message { get; private set; }
         public string Prompt { get; private set; }
+        public bool WaitingForVerification { get; private set; }
         public event Action Changed;
         bool busy, sawGeneration, adopt;
         bool termsAttempted, termsWaiting;
@@ -76,14 +77,19 @@ namespace ArenaCompanion {
             adopt = useCurrent; expectedUrl = null; signature = null; sawGeneration = false;
             termsAttempted=termsWaiting=false;
             termsSubmissionPending=false;termsDraftSince=DateTime.MinValue;
-            seenRateLimit=0;RetryAt=null;retryFailedAttempt=rateLimitResubmitting=false;
+            seenRateLimit=0;RetryAt=null;
             readFailures=0;nextRead=DateTime.MinValue;
+            WaitingForVerification=false;
             if(preparation!=null)preparation.BeginRound();
             Running = true; Finished = false; CandidateReady=false;CandidateUrl=null;Collected=0; until = clock().AddMinutes(2); Move("inspect");
             Say("正在检查页面，请稍候…");
         }
         public void Pause(string reason) {
-            epoch++; Running = false; Say(reason);
+            epoch++; Running = false; WaitingForVerification=false; Say(reason);
+        }
+        void PauseForVerification(string reason) {
+            epoch++; Running=false; WaitingForVerification=true; nextRead=DateTime.MinValue;
+            Say(reason+"，请在右侧完成；通过后将自动继续当前进度");
         }
         public void CancelForRecovery() {
             CandidateReady=false;CandidateUrl=null;Finished=true;
@@ -92,7 +98,7 @@ namespace ArenaCompanion {
         public void Resume() {
             if (busy) throw new InvalidOperationException("上一操作仍在结束，请稍后重试");
             if (Running || Finished || Phase == "idle") return;
-            epoch++; Running = true; until = clock().AddMinutes(2); phaseSince = clock();
+            epoch++; Running = true; WaitingForVerification=false; until = clock().AddMinutes(2); phaseSince = clock();
             nextRead=DateTime.MinValue;
             Say("继续当前进度，不重复发送已提交的问题");
         }
@@ -107,19 +113,24 @@ namespace ArenaCompanion {
         }
         bool Late(int seconds) { return (clock() - phaseSince).TotalSeconds >= seconds; }
         public async Task Tick() {
-            if (!Running || busy || clock()<nextRead) return;
+            if ((!Running&&!WaitingForVerification) || busy || clock()<nextRead) return;
             busy = true; int currentEpoch = epoch;
             try {
                 PageState v;DateTime readingSince=clock();
                 try {v=await page.Read(Prompt);}
                 catch(TimeoutException) {
-                    if(!Running||epoch!=currentEpoch)return;
+                    if((!Running&&!WaitingForVerification)||epoch!=currentEpoch)return;
                     if(readFailures==0)readFailureSince=readingSince;
                     readFailures++;signature=null;
                     int delay=Math.Min(20,3*(1<<Math.Min(3,readFailures-1)));nextRead=clock().AddSeconds(delay);
                     Say("暂时无法读取网页，"+delay+" 秒后自动检查；当前任务保留，不重复提交");return;
                 }
-                if (!Running || epoch != currentEpoch) return;
+                if ((!Running&&!WaitingForVerification) || epoch != currentEpoch) return;
+                if(WaitingForVerification) {
+                    if(!String.IsNullOrEmpty(v.blocker))return;
+                    WaitingForVerification=false;Running=true;until=clock().AddMinutes(2);phaseSince=clock();nextRead=DateTime.MinValue;
+                    Say("人机验证已完成，自动继续当前进度，不重复提交");return;
+                }
                 if(readFailures>0){var gap=clock()-readFailureSince;until=until.Add(gap);phaseSince=phaseSince.Add(gap);readFailures=0;nextRead=DateTime.MinValue;Say("页面读取已恢复，继续当前任务");}
                 if (!page.IsAllowed(v.url)) { Pause("请在软件内打开 Arena Agent 页面"); return; }
                 if(HandleCooldown(v))return;
@@ -133,7 +144,11 @@ namespace ArenaCompanion {
                     } else if((clock()-termsSince).TotalSeconds>=20)Pause("网站条款确认尚未生效，已暂停，避免重复点击");
                     return;
                 }
-                if (!String.IsNullOrEmpty(v.blocker)&&!(rateLimitResubmitting&&v.blocker=="网站限流，请稍后继续")) { Pause(v.blocker + "，处理后点击“继续”"); return; }
+                if (!String.IsNullOrEmpty(v.blocker)) {
+                    if(v.blocker.IndexOf("人机",StringComparison.OrdinalIgnoreCase)>=0||v.blocker.IndexOf("Security Verification",StringComparison.OrdinalIgnoreCase)>=0||v.blocker.IndexOf("Verify you are human",StringComparison.OrdinalIgnoreCase)>=0)PauseForVerification(v.blocker);
+                    else Pause(v.blocker + "，处理后点击“继续”");
+                    return;
+                }
                 if(termsWaiting) {termsWaiting=false;phaseSince=clock();until=clock().AddMinutes(2);Say("网站条款已确认，自动继续当前进度");}
                 if(ContinueAfterTerms(v))return;
                 if (!v.main) { if (Late(20)) Pause("页面尚未加载完成，请稍后继续"); return; }
@@ -152,7 +167,6 @@ namespace ArenaCompanion {
                 }
                 if (Phase == "observe" || Phase == "confirm") {
                     if (!v.promptConfirmed) { if (Late(20)) Pause("发送结果尚未确认，已暂停，不会自动重发"); return; }
-                    rateLimitResubmitting=false;
                     expectedUrl = v.url;
                     if (Phase == "confirm") { Move("observe"); Say("第 " + Attempt + " 次：等待回答，正在检查 Thinking…"); }
                     if (v.thinking) { Rejected++; Move("reject"); Say("第 " + Attempt + " 次出现 Thinking，准备换下一次"); return; }
@@ -188,7 +202,7 @@ namespace ArenaCompanion {
                 if (Phase == "fill") {
                     if (!v.editor || v.conversation || v.generating) { Pause("当前不是空白新对话，请先打开新对话再继续"); return; }
                     if (!String.IsNullOrEmpty(v.draft) && v.draft != Prompt) { Pause("右侧有不同的草稿，已保留；请自行处理后继续"); return; }
-                    await page.Act(rateLimitResubmitting?"retryFill":"fill", Prompt);
+                    await page.Act("fill", Prompt);
                     if (Running && epoch == currentEpoch) {
                         Move(preparation==null?"send":"prepare");
                         if(preparation!=null&&preparation.Required)Say("正在检查并上传已绑定附件，确认后自动发送");
@@ -208,8 +222,7 @@ namespace ArenaCompanion {
                     if (LimitReached) { Done("已达到次数上限"); return; }
                     Attempt++; sawGeneration = false; signature = null; Move("confirm");
                     Say("已提交第 " + Attempt + " 次，等待网页确认…");
-                    string sendAction=rateLimitResubmitting?"retrySend":"send";
-                    await page.Act(sendAction, Prompt); return;
+                    await page.Act("send", Prompt); return;
                 }
             } catch (Exception ex) { Pause("操作已暂停：" + ex.Message); }
             finally { busy = false; }

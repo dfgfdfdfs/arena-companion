@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -25,10 +25,6 @@ namespace ArenaCompanion {
             using (var mutex = new Mutex(true, InstanceContext.MutexName(Environment.GetEnvironmentVariable("ARENA_DATA_DIRECTORY")), out created)) {
                 if (!created) { if(Environment.GetEnvironmentVariable("ARENA_BACKGROUND")!="1")MessageBox.Show("这个实例已经打开。请选用另一个实例名。", "Arena 多开"); return; }
                 try {
-                    var store=new AccountStore(Environment.GetEnvironmentVariable("ARENA_DATA_DIRECTORY"));
-                    if(String.IsNullOrEmpty(store.Load().Password)) {
-                        using(var setup=new AccountSetupDialog(store))if(setup.ShowDialog()!=DialogResult.OK)return;
-                    }
                     Application.Run(new MainForm(Array.IndexOf(args, "--demo") >= 0));
                 } catch (Exception ex) {
                     MessageBox.Show("软件未能启动：\n" + ex.Message + "\n请保留整个软件文件夹，不要只移动 exe。", "Arena 筛选助手");

@@ -40,7 +40,7 @@ namespace ArenaCompanion {
         }
         async Task CollectionTick() {
             if(collecting)return;
-            if(authFlow!=null&&authFlow.Running){await authFlow.Tick();return;}
+            if(authFlow!=null&&(authFlow.Running||authFlow.WaitingForVerification)){await authFlow.Tick();return;}
             if(authFlow!=null&&StartTaskAfterLogin())return;
             if(controller==null)return;await controller.Tick();
             if(!controller.CandidateReady)collectionAttempted=false;
@@ -80,6 +80,7 @@ namespace ArenaCompanion {
             if(command=="gallery.click"){if(gallery==null)throw new InvalidOperationException("请先打开图集");await gallery.ClickImage(AuthFlow.Value(request,"id"));return new {ok=true};}
             if(command=="gallery.context"){if(gallery==null)throw new InvalidOperationException("请先打开图集");await gallery.ContextAction(AuthFlow.Value(request,"id"),AuthFlow.Value(request,"file"),AuthFlow.Value(request,"action"));return new {ok=true};}
             if(command=="gallery.directory"){if(gallery==null)throw new InvalidOperationException("请先打开图集");gallery.SetDestination(AuthFlow.Value(request,"path"));return new {ok=true};}
+            if(command=="gallery.clear"){if(gallery==null)throw new InvalidOperationException("请先打开图集");gallery.Clear();RefreshGalleryButton();return new {ok=true,records=0};}
             if(command=="gallery.capture"){
                 if(gallery==null)throw new InvalidOperationException("请先打开图集");
                 string folder=Path.Combine(DataDirectory,"GalleryQA");Directory.CreateDirectory(folder);

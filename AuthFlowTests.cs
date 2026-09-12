@@ -48,7 +48,9 @@ namespace ArenaCompanion {
             Check(flow.Phase=="complete"&&!flow.Running&&store.Load().Verified,"main page matching account confirms success");
             Check(!File.ReadAllText(Directory.GetFiles(root,"account.dpapi",SearchOption.AllDirectories)[0]).Contains("Test-password"),"password storage is encrypted");
             pages=new FakeAuthPages();pages.Arena["blocker"]="需要亲自完成人机验证";flow=new AuthFlow(pages,NewStore(root));flow.Start();Step(flow,1);
-            Check(!flow.Running&&pages.Actions.Count==1,"challenge stops before form actions");
+            Check(!flow.Running&&flow.WaitingForVerification&&pages.Actions.Count==1,"challenge stops before form actions and remains read-only observable");
+            Step(flow,3);Check(pages.Actions.Count==1,"challenge polling never submits a form");
+            pages.Arena["blocker"]="";Step(flow,2);Check(flow.Running&&pages.Actions.Contains("openLogin"),"cleared challenge automatically resumes the saved login stage");
             pages=new FakeAuthPages();pages.Ambiguous=true;flow=new AuthFlow(pages,NewStore(root));flow.Start();Step(flow,12);
             Check(!flow.Running&&pages.Actions.FindAll(x=>x=="create").Count==1,"ambiguous registration stops without duplicate submission");
             pages=new FakeAuthPages();flow=new AuthFlow(pages,NewStore(root));flow.Start();Step(flow,10);

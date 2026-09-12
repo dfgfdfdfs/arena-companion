@@ -55,5 +55,13 @@ namespace ArenaCompanion {
             File.WriteAllText(temp,json.Serialize(record));
             if(File.Exists(target))File.Replace(temp,target,null);else File.Move(temp,target);
         }
+        public void Clear() {
+            foreach(string file in Directory.GetFiles(DirectoryPath)) {
+                string extension=Path.GetExtension(file);
+                if(extension.Equals(".json",StringComparison.OrdinalIgnoreCase)||extension.Equals(".png",StringComparison.OrdinalIgnoreCase)||extension.Equals(".tmp",StringComparison.OrdinalIgnoreCase))File.Delete(file);
+            }
+            string discarded=Path.Combine(DirectoryPath,"_discarded");
+            if(Directory.Exists(discarded))Directory.Delete(discarded,true);
+        }
     }
 }

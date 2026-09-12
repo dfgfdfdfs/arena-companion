@@ -22,6 +22,7 @@ namespace ArenaCompanion {
         public string Phase { get; private set; }
         public string Message { get; private set; }
         public string Email { get { return account == null ? "" : account.Email; } }
+        public bool WaitingForVerification {get;private set;}
         public event Action Changed;
         public AuthFlow(IAuthPages pages, AccountStore store, Func<DateTime> clock = null,bool existingOnly=false) {
             this.pages=pages; this.store=store; this.clock=clock ?? (()=>DateTime.UtcNow);
@@ -40,21 +41,33 @@ namespace ArenaCompanion {
             if(String.IsNullOrEmpty(account.Email)&&!account.MailboxChangeConfirmed)account.MailboxRefreshRequested=false;
             if(String.IsNullOrEmpty(account.Password)) throw new InvalidOperationException("请先设置登录密码");
             if(existingOnly&&String.IsNullOrWhiteSpace(account.Email))throw new InvalidOperationException("保存项中没有账号");
-            epoch++; Running=true; deadline=clock().AddMinutes(8); previousStage="";
+            epoch++; Running=true; WaitingForVerification=false; deadline=clock().AddMinutes(8); previousStage="";
             pages.Navigate("arena","https://arena.ai/agent"); Say("inspect","正在检查 Arena 登录状态");
         }
-        public void Stop(string reason) { epoch++; Running=false; Say("paused",reason); }
+        public void Stop(string reason) { epoch++; Running=false; WaitingForVerification=false; Say("paused",reason); }
+        void PauseForVerification(string target,string reason) {
+            verificationPhase=Phase;verificationTarget=target;epoch++;Running=false;WaitingForVerification=true;
+            Say("verification",reason+"，请在当前页面完成；通过后将自动继续登录");
+        }
         async Task Action(string target,string action) { await pages.Act(target,action,account); }
+        string verificationPhase="",verificationTarget="arena";
         public async Task Tick() {
-            if(!Running || busy)return;
+            if((!Running&&!WaitingForVerification) || busy)return;
             busy=true; int generation=epoch;
             try {
+                if(WaitingForVerification) {
+                    var verificationState=await pages.Read(verificationTarget);
+                    if(!WaitingForVerification||generation!=epoch)return;
+                    if(Value(verificationState,"blocker")!="")return;
+                    WaitingForVerification=false;Running=true;Phase=verificationPhase;deadline=clock().AddMinutes(8);previousStage="";
+                    Say(Phase,"人机验证已完成，自动继续登录流程");return;
+                }
                 if(clock()>deadline) {Stop("登录超时，保留账号；可再次自动登录");return;}
                 string target=(Phase=="mailbox"||Phase=="mail"||Phase=="verify"||Phase=="passwordFilled"||Phase=="passwordSubmitted")?"auth":"arena";
                 var state=await pages.Read(target);
                 if(!Running||generation!=epoch)return;
                 string stage=Value(state,"stage");
-                if(Value(state,"blocker")!="") {Stop(Value(state,"blocker"));return;}
+                if(Value(state,"blocker")!="") {PauseForVerification(target,Value(state,"blocker"));return;}
                 if(stage=="invalid") {Stop("邮箱确认链接无效，请在 Arena 重新发送确认邮件后重试");return;}
                 if((clock()-changedAt).TotalSeconds>60 && stage==previousStage && Phase!="mail") {Stop("页面未进入下一步，保留当前页面，请检查后重试");return;}
                 previousStage=stage;

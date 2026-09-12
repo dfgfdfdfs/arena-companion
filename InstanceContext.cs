@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace ArenaCompanion {
     public static class InstanceContext {
         public static string Name {get;private set;}
-        public static string Root {get {return Environment.GetEnvironmentVariable("ARENA_INSTANCE_ROOT")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Arena筛选助手独立版");}}
+        public static string Root {get {return Environment.GetEnvironmentVariable("ARENA_INSTANCE_ROOT")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Arena筛选助手多开");}}
         public static string DirectoryFor(string root,string name) {
             if(String.IsNullOrWhiteSpace(name)||!Regex.IsMatch(name,@"^[\p{L}\p{N}_ -]{1,40}$")||name!=name.Trim())throw new ArgumentException("实例名请使用 1 至 40 个文字、数字、空格、下划线或短横线");
             return Path.Combine(Path.GetFullPath(root),name);

@@ -17,6 +17,8 @@ namespace ArenaCompanion {
         AuthFlow authFlow;
         AccountStore accountStore;
         ControlPipe controlPipe;
+        bool verificationSignalHandled;
+        bool rateLimitSignalHandled;
         void AddBrowserTabs(Control parent) {
             var arenaTab=new TabPage("Arena");var authTab=new TabPage("邮箱 / 账号验证");
             browser.Dock=authBrowser.Dock=DockStyle.Fill;
@@ -24,13 +26,13 @@ namespace ArenaCompanion {
             AddAccountReplacement(authTab);
             browserTabs.TabPages.Add(arenaTab);browserTabs.TabPages.Add(authTab);parent.Controls.Add(browserTabs);
         }
-        async Task InitializeLogin(CoreWebView2Environment env) {
+        async Task<bool> InitializeLogin(CoreWebView2Environment env) {
             await authBrowser.EnsureCoreWebView2Async(env);
             authBrowser.CoreWebView2.Settings.IsPasswordAutosaveEnabled=false;
             authBrowser.CoreWebView2.Settings.IsGeneralAutofillEnabled=false;
             authBrowser.CoreWebView2.NewWindowRequested+=(s,e)=>{e.Handled=true;NavigatePopup(e.Uri);};
             accountStore=new AccountStore(DataDirectory);
-            accountStore.EnsurePassword();
+            if(!EnsureInstancePassword())return false;
             authPages=new AuthPages(target=>{
                 browserTabs.SelectedIndex=target=="arena"?0:1;
                 return target=="arena"?browser:authBrowser;
@@ -43,10 +45,34 @@ namespace ArenaCompanion {
                 try {File.AppendAllText(Path.Combine(DataDirectory,"登录记录.txt"),DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")+"  "+authFlow.Phase+"  "+authFlow.Message+Environment.NewLine);}catch(IOException){}
                 SetEnabled();
                 QueueQaCapture();
+                HandleVerificationSignal(true);
             };
             controlPipe=new ControlPipe(DataDirectory,DispatchOnUi);
             var serving=controlPipe.Run();
             FormClosed+=(s,e)=>controlPipe.Dispose();
+            return true;
+        }
+        bool EnsureInstancePassword() {
+            if(!String.IsNullOrEmpty(accountStore.Load().Password))return true;
+            string defaults=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","account-defaults","account.dpapi");
+            if(File.Exists(defaults)){accountStore.EnsurePassword();return true;}
+            return PasswordSetupDialog.Configure(this,accountStore);
+        }
+        void HandleVerificationSignal(bool loginFlow) {
+            bool waiting=loginFlow?authFlow.WaitingForVerification:controller.WaitingForVerification;
+            if(!waiting){verificationSignalHandled=false;return;}
+            browserTabs.SelectedIndex=1;
+            if(verificationSignalHandled)return;
+            verificationSignalHandled=true;
+            changeAccount.PerformClick();
+        }
+        void HandleRateLimitSignal() {
+            bool detected=controller!=null&&controller.Phase=="cooldown"&&controller.Finished&&!controller.Running;
+            if(!detected){rateLimitSignalHandled=false;return;}
+            browserTabs.SelectedIndex=1;
+            if(rateLimitSignalHandled)return;
+            rateLimitSignalHandled=true;
+            switchIp.PerformClick();
         }
         void NavigatePopup(string url) {
             Uri uri;
@@ -61,7 +87,7 @@ namespace ArenaCompanion {
             } catch(Exception ex) {ShowError(ex.Message);}
         }
         void BeginAutoLogin() {
-            accountStore.EnsurePassword();
+            if(!EnsureInstancePassword())throw new InvalidOperationException("必须先设置邮箱账号密码");
             controller.Pause("自动登录处理中");page.Demo=false;
             mode.Text="在线模式 · 自动注册 / 登录 · 账号在本机加密保存";
             authFlow.Start();SetEnabled();
@@ -79,8 +105,9 @@ namespace ArenaCompanion {
             return new {ok=true,ready,instance=InstanceContext.Name,dataDirectory=DataDirectory,browserDirectory=browser.CoreWebView2.Environment.UserDataFolder,mode=page.Demo?"demo":"online",phase=controller.Phase,running=controller.Running,
                 finished=controller.Finished,attempt=controller.Attempt,limit=controller.Limit,unlimited=controller.Limit==0,rejected=controller.Rejected,collected=controller.Collected,collecting,message=status.Text,
                 cooldownSeconds=controller.CooldownSeconds,retryAt=controller.RetryAt.HasValue?controller.RetryAt.Value.ToString("o"):null,
-                replacing,startAfterLogin=loginTaskStart.Pending,
-                auth=new {running=authFlow.Running,phase=authFlow.Phase,message=authFlow.Message,email=authFlow.Email}};
+                replacing,startAfterLogin=loginTaskStart.Pending,waitingForVerification=controller.WaitingForVerification,
+                network=new {switching=switchingIp,ok=lastIpSwitchOk,message=ipStatus.Text},
+                auth=new {running=authFlow.Running,waitingForVerification=authFlow.WaitingForVerification,phase=authFlow.Phase,message=authFlow.Message,email=authFlow.Email}};
         }
         async Task<object> Control(Dictionary<string,object> request) {
             string command=AuthFlow.Value(request,"command");
@@ -106,6 +133,11 @@ namespace ArenaCompanion {
             if(command=="page.read")return new {ok=true,state=await page.Read(controller.Prompt ?? "")};
             if(command=="page.inspect")return new {ok=true,details=await page.Inspect()};
             if(command=="capture") {await CaptureForQa();return new {ok=true};}
+            if(command=="network.show") {browserTabs.SelectedIndex=1;await CaptureForQa();return new {ok=true};}
+            if(command=="network.switch") {
+                if(authFlow.Running||controller.Running||collecting||replacing)throw new InvalidOperationException("请先停止当前登录、任务或收集流程");
+                string message=await SwitchToNextIp();return new {ok=lastIpSwitchOk,message=message};
+            }
             if(command=="auth.read") {
                 var state=await authPages.Read(AuthFlow.Value(request,"target")=="auth"?"auth":"arena");
                 bool hasVerification=AuthFlow.Value(state,"verifyUrl")!="";
@@ -115,7 +147,7 @@ namespace ArenaCompanion {
             if(command=="account.configure") {
                 var data=accountStore.Load();
                 string email=AuthFlow.Value(request,"email"), password=AuthFlow.Value(request,"password");
-                string validation=AccountSetup.Validate(email,password,password);if(validation!=null)throw new ArgumentException(validation);
+                if(password.Length<8)throw new ArgumentException("密码至少需要 8 个字符");
                 data.Email=email;data.Password=password;data.Name="Kai";data.Verified=false;accountStore.Save(data);
                 return new {ok=true,email=data.Email,passwordStored=true};
             }

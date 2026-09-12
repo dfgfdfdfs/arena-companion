@@ -34,7 +34,7 @@ namespace ArenaCompanion {
             if(Environment.GetEnvironmentVariable("ARENA_BACKGROUND")=="1") {Opacity=0;ShowInTaskbar=false;}
             InitializeTaskSettings();BuildUi();
             Shown += async (s,e) => await Initialize();
-            FormClosing += (s,e) => { collectionCancelled=true;if (controller != null) controller.Pause("软件已关闭，自动操作已停止"); if(authFlow!=null)authFlow.Stop("软件已关闭"); timer.Stop();try {SaveTaskSettings();}catch(IOException){} };
+            FormClosing += (s,e) => { collectionCancelled=true;if (controller != null) controller.Pause("软件已关闭，自动操作已停止"); if(authFlow!=null)authFlow.Stop("软件已关闭"); timer.Stop();networkTimer.Stop();try {SaveTaskSettings();}catch(IOException){} };
         }
         Label Caption(string text, int size, bool bold, Color color) {
             return new Label { Text=text, AutoSize=false, Dock=DockStyle.Fill, TextAlign=ContentAlignment.MiddleLeft,
@@ -89,7 +89,7 @@ namespace ArenaCompanion {
             log.Dock=DockStyle.Fill;log.HorizontalScrollbar=true;log.BorderStyle=BorderStyle.FixedSingle;log.Font=new Font("Microsoft YaHei UI",9F);log.AccessibleName="运行记录";
             side.Controls.Add(log,0,12);
             side.Controls.Add(Caption("回答超过 2 分钟仍持续检测，完成后自动收图。",9,false,secondary),0,13);
-            side.Controls.Add(Caption("遇到验证码，请在右侧亲自完成。",9,false,secondary),0,14);
+            side.Controls.Add(Caption("遇到验证码会自动转到账号页并等待。",9,false,secondary),0,14);
             side.Controls.Add(Caption("无 Thinking 仅为候选，模型需自行确认。",9,false,secondary),0,15);
             ConfigureGalleryControls(side);
             var right = new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=new Padding(0)};
@@ -110,7 +110,7 @@ namespace ArenaCompanion {
                 Directory.CreateDirectory(DataDirectory);
                 var env = await CoreWebView2Environment.CreateAsync(null,Path.Combine(DataDirectory,"Browser"));
                 await browser.EnsureCoreWebView2Async(env);
-                await InitializeLogin(env);
+                if(!await InitializeLogin(env)){Close();return;}
                 browser.CoreWebView2.Settings.IsPasswordAutosaveEnabled=false;
                 browser.CoreWebView2.Settings.IsGeneralAutofillEnabled=false;
                 browser.CoreWebView2.NewWindowRequested += (s,e) => {e.Handled=true;NavigatePopup(e.Uri);};
@@ -129,7 +129,7 @@ namespace ArenaCompanion {
                 InitializeGallery();
                 recovery=new ConversationRecovery(browser,DataDirectory,()=>ready&&!collecting&&!authFlow.Running,message=>CollectionStatus(message),()=>{collectionAttempted=true;controller.CancelForRecovery();});
                 FormClosed+=(s,e)=>recovery.Dispose();
-                ready=true;timer.Start();
+                ready=true;timer.Start();networkTimer.Start();
                 if(demoAtStart)OpenDemo();else if(Environment.GetEnvironmentVariable("ARENA_AUTO_LOGIN")=="1")BeginAutoLogin();else{browser.CoreWebView2.Navigate("https://arena-demo.local/welcome.html");OnChanged();}
             } catch(Exception ex){ShowError("内置浏览器无法启动："+ex.Message+"。本软件需要系统已有的 Microsoft Edge WebView2。");}
             SetEnabled();
@@ -165,6 +165,8 @@ namespace ArenaCompanion {
             }
             SetEnabled();
             QueueQaCapture();
+            HandleRateLimitSignal();
+            HandleVerificationSignal(false);
         }
         async void QueueQaCapture() { await CaptureForQa(); }
         // Test-only, opt-in capture of this application's own rendered client area.
@@ -203,6 +205,8 @@ namespace ArenaCompanion {
             bool running=replacing||collecting||(controller!=null && controller.Running);
             bool loggingIn=authFlow!=null&&authFlow.Running;
             changeAccount.Enabled=ready&&!loggingIn&&!collecting&&!replacing;
+            rateLimitTest.Enabled=ready;
+            switchIp.Enabled=ready&&!switchingIp&&!running&&!loggingIn;
             attachmentsButton.Enabled=ready&&!running&&!loggingIn;
             galleryButton.Enabled=ready;collectButton.Enabled=ready&&!running&&!loggingIn;keepCollecting.Enabled=!running;
             autoLogin.Enabled=ready&&!running&&!loggingIn;cancelLogin.Enabled=ready&&loggingIn;

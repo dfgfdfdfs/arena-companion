@@ -7,16 +7,12 @@ using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 namespace ArenaCompanion {
     static class RateLimitTests {
-        sealed class FixtureHost : Form {
-            protected override bool ShowWithoutActivation {get{return true;}}
-            protected override CreateParams CreateParams {get{var value=base.CreateParams;value.ExStyle|=0x08000000;return value;}}
-        }
         static int passed;
         const string Endpoint="https://arena.ai/nextjs-api/stream/create-chat";
         static void Check(bool value,string name){if(!value)throw new Exception(name);passed++;Console.WriteLine("PASS "+name);}
         [STAThread] static int Main() {
             Application.EnableVisualStyles();int result=0;
-            using(var host=new FixtureHost {Opacity=0,ShowInTaskbar=false}) {
+            using(var host=new Form {Opacity=0,ShowInTaskbar=false}) {
                 host.Shown+=async(s,e)=>{try{await Run();}catch(Exception ex){Console.WriteLine(ex);result=1;}finally{host.Close();}};
                 Application.Run(host);
             }
@@ -62,7 +58,7 @@ namespace ArenaCompanion {
             Check(failed,"JavaScript failures remain explicit rather than becoming empty successful states");
         }
         static async Task BrowserFlow(string root) {
-            using(var host=new FixtureHost {Opacity=0,ShowInTaskbar=false,Width=900,Height=700})
+            using(var host=new Form {Opacity=0,ShowInTaskbar=false,Width=900,Height=700})
             using(var view=new WebView2 {Dock=DockStyle.Fill}) {
                 host.Controls.Add(view);host.Show();
                 await view.EnsureCoreWebView2Async(await CoreWebView2Environment.CreateAsync(null,Path.Combine(root,"Browser")));
@@ -75,21 +71,22 @@ namespace ArenaCompanion {
                 view.CoreWebView2.WebResourceRequested+=(s,e)=>{
                     string body="",headers="Content-Type: text/html\r\n";int code=200;
                     if(e.Request.Uri==Endpoint){requests++;requestTimes.Add(DateTime.UtcNow);code=requests<=2?429:200;body="{}";headers="Content-Type: application/json\r\n";if(code==429)headers+="Retry-After: "+(requests==1?600:300)+"\r\n";}
-                    else if(e.Request.Uri=="https://arena.ai/agent")body="<!doctype html><meta charset=utf-8><main><p>LOCAL cooldown fixture</p><div contenteditable=true>hello</div><button aria-label='Send message' onclick='send()'>Send</button><div id=reply></div><div id=error role=alert></div></main><script>async function send(){const r=await fetch('/nextjs-api/stream/create-chat',{method:'POST'});if(!r.ok){document.getElementById('error').textContent='Too many requests';return;}await new Promise(resolve=>setTimeout(resolve,1400));document.getElementById('error').textContent='';if(r.ok){history.replaceState(null,'','/agent/11111111-1111-4111-8111-111111111111');document.querySelector('#reply').innerHTML='<div role=log>hello<br>A completed fixture response with enough visible text.</div><button id=stop aria-label=\"Stop generating\">Stop</button>';setTimeout(()=>document.getElementById('stop').remove(),800);}}</script>";
+                    else if(e.Request.Uri=="https://arena.ai/agent")body="<!doctype html><meta charset=utf-8><main><p>LOCAL cooldown fixture</p><div contenteditable=true></div><button aria-label='Send message' onclick='send()'>Send</button><div id=reply></div><div id=error role=alert></div></main><script>async function send(){const r=await fetch('/nextjs-api/stream/create-chat',{method:'POST'});if(!r.ok){document.getElementById('error').textContent='Too many requests';return;}await new Promise(resolve=>setTimeout(resolve,1400));document.getElementById('error').textContent='';if(r.ok){history.replaceState(null,'','/agent/11111111-1111-4111-8111-111111111111');document.querySelector('#reply').innerHTML='<div role=log>hello<br>A completed fixture response with enough visible text.</div><button id=stop aria-label=\"Stop generating\">Stop</button>';setTimeout(()=>document.getElementById('stop').remove(),800);}}</script>";
                     else code=404;
                     e.Response=view.CoreWebView2.Environment.CreateWebResourceResponse(new MemoryStream(Encoding.UTF8.GetBytes(body)),code,code==429?"Too Many Requests":"OK",headers);
                 };
                 var page=new WebPage(view);var loaded=new TaskCompletionSource<bool>();
                 view.CoreWebView2.NavigationCompleted+=(s,e)=>loaded.TrySetResult(e.IsSuccess);view.CoreWebView2.Navigate("https://arena.ai/agent");
                 if(await Task.WhenAny(loaded.Task,Task.Delay(10000))!=loaded.Task||!await loaded.Task)throw new Exception("fixture navigation failed");
-                var controller=new RetryController(page,null,new AttachmentUpload(view));controller.Start("hello",1,false);bool firstCountdown=false,updatedCountdown=false;DateTime deadline=DateTime.UtcNow.AddSeconds(30);
-                while(DateTime.UtcNow<deadline&&!controller.CandidateReady){await controller.Tick();if(controller.Phase=="cooldown"){if(requests==1&&controller.CooldownSeconds>=595)firstCountdown=true;if(requests==2&&controller.CooldownSeconds>=295&&controller.CooldownSeconds<=300)updatedCountdown=true;}if(!controller.Running&&!controller.CandidateReady)throw new Exception(controller.Message);await Task.Delay(100);}
-                Check(firstCountdown&&updatedCountdown,"native 429 replies replace the displayed server countdown from 600 to 300 seconds");
-                Check(requests==3&&(requestTimes[1]-requestTimes[0]).TotalSeconds>=5&&(requestTimes[1]-requestTimes[0]).TotalSeconds<8&&(requestTimes[2]-requestTimes[1]).TotalSeconds>=5&&(requestTimes[2]-requestTimes[1]).TotalSeconds<8,"actual browser retries twice at five-second intervals before either server deadline");
-                await controller.Tick();var state=await page.Read("hello");
-                Check(state.promptConfirmed&&state.response&&controller.Attempt==1,"recovered browser response corresponds to the original attempt");
-                Check(controller.CandidateReady&&requests==3,"success resumes observation and reaches candidate collection without another retry");
-                File.WriteAllText(Path.Combine(root,"request-timing.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new {requests,firstRetrySeconds=(requestTimes[1]-requestTimes[0]).TotalSeconds,secondRetrySeconds=(requestTimes[2]-requestTimes[1]).TotalSeconds,firstCountdown,updatedCountdown,candidateReady=controller.CandidateReady,online=false}));
+                var controller=new RetryController(page,null,new AttachmentUpload(view));controller.Start("hello",1,false);DateTime deadline=DateTime.UtcNow.AddSeconds(15);
+                while(DateTime.UtcNow<deadline&&controller.Running){await controller.Tick();await Task.Delay(100);}
+                Check(!controller.Running&&controller.Finished&&controller.Phase=="cooldown","native 429 stops the active browser task");
+                Check(controller.CooldownSeconds==0&&controller.Message.Contains("不会倒计时或自动重试"),"native 429 exposes no countdown or retry schedule");
+                int stoppedRequests=requests;await Task.Delay(6500);for(int i=0;i<10;i++)await controller.Tick();
+                Check(stoppedRequests==1&&requests==1,"native 429 produces exactly one request and never retries after five seconds");
+                var state=await page.Read("hello");
+                Check(state.rateLimitId>0&&state.rateLimitRetryAt>DateTime.UtcNow,"server limit details remain observable without driving retries");
+                File.WriteAllText(Path.Combine(root,"request-timing.json"),new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new {requests,stopped=true,countdownSeconds=controller.CooldownSeconds,finished=controller.Finished,online=false}));
             }
         }
     }

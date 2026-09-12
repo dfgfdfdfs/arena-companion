@@ -1,0 +1,9 @@
+diff --git a/v2rayN/v2rayN/Views/MainWindow.xaml.cs b/v2rayN/v2rayN/Views/MainWindow.xaml.cs
+index b3869ca..309cd35 100644
+--- a/v2rayN/v2rayN/Views/MainWindow.xaml.cs
++++ b/v2rayN/v2rayN/Views/MainWindow.xaml.cs
+@@ -18,0 +19 @@ public partial class MainWindow
++    private readonly ArenaControlServer _arenaControl;
+@@ -40,0 +42,2 @@ public partial class MainWindow
++        _arenaControl = new ArenaControlServer(_config, ViewModel, Dispatcher);
++        Application.Current.Exit += (_, _) => _arenaControl.Dispose();

@@ -49,6 +49,10 @@ namespace ArenaCompanion {
                     if(picker.ShowDialog(this)==DialogResult.OK)SetDestination(picker.SelectedPath);
                 }return;
             }
+            if(action=="clear") {
+                if(!canEdit())throw new InvalidOperationException("正在收集图片，请收集完成后再清空");
+                store.Clear();Reload();if(Changed!=null)Changed();Notice("当前候选图集已清空");return;
+            }
             var record=store.Get(Convert.ToString(message["id"]));string file=Convert.ToString(message["file"]);
             if(!record.Images.Any(i=>i.File==file))throw new InvalidOperationException("该图片已不在图集中");
             if((action=="discard"||action=="save")&&!canEdit())throw new InvalidOperationException("正在收集图片，请收集完成后再操作");
@@ -59,6 +63,7 @@ namespace ArenaCompanion {
         }
         void Notice(string text) {view.CoreWebView2.PostWebMessageAsJson(json.Serialize(new {notice=text}));}
         public void SetDestination(string path) {exports.SetDestination(path);Reload();}
+        public void Clear() {if(!canEdit())throw new InvalidOperationException("正在收集图片，请收集完成后再清空");store.Clear();Reload();if(Changed!=null)Changed();}
         public void Reload() {if(Ready)view.CoreWebView2.PostWebMessageAsJson(json.Serialize(new {records=store.All(),destination=exports.Destination}));}
         public async Task<object> Inspect() {
             if(!Ready)return new {ready=false};

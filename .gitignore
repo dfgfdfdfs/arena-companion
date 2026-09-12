@@ -3,6 +3,9 @@ artifacts/
 bin/
 obj/
 成品/
+成品-*/
+分发版-*/
+v2rayN控制组件/
 qa/
 Profiles/
 Browser/
@@ -11,6 +14,9 @@ RenderBrowser/
 故障恢复备份/
 account-defaults/
 *.dpapi
+*.exe
+*.pdb
+*.zip
 *.log
 *.tmp
 tests-*.txt

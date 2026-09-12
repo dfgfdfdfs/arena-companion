@@ -65,6 +65,10 @@ namespace ArenaCompanion {
                 Check(store.Get(second.Id).Images.Count==1,"active collection blocks conflicting gallery edits");canEdit=true;
                 await gallery.ContextAction(second.Id,second.Images[0].File,"discard");await Task.Delay(300);
                 Check(store.Get(second.Id).Images.Count==0&&store.Get(first.Id).Images.Count==1&&File.Exists(Path.Combine(store.DirectoryPath,first.Images[0].File)),"discard menu removes only the selected image and retains other candidates");
+                string profileMarker=Path.Combine(second.Profile,"profile-marker.txt"),exportMarker=Path.Combine(root,"export-marker.txt");File.WriteAllText(profileMarker,"keep profile");File.WriteAllText(exportMarker,"keep export");
+                store.Clear();gallery.Reload();await Task.Delay(250);
+                Check(store.All().Count==0&&Directory.GetFiles(store.DirectoryPath,"*.png").Length==0&&!Directory.Exists(Path.Combine(store.DirectoryPath,"_discarded")),"clear removes current candidate records, images and discarded cache");
+                Check(File.Exists(profileMarker)&&File.Exists(exportMarker),"clear does not touch account profiles or exported files");
             }
             await TestCollector(root);
             File.WriteAllText(Path.Combine(root,"result.json"),new JavaScriptSerializer().Serialize(new {passed,online=false,root}));
