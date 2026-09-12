@@ -127,14 +127,19 @@ namespace ArenaCompanion {
             var now=DateTime.UtcNow;var p=new FakePage();var c=new RetryController(p,()=>now);c.Start("hello",1,false);Steps(c,3);
             p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.url="https://arena.ai/agent";p.V.draft="hello";p.V.rateLimitId=1;p.V.rateLimitRetryAt=now.AddSeconds(640);Steps(c,1);
             Check(c.Phase=="cooldown"&&!c.Running&&c.Finished&&c.CooldownSeconds==0,"429 stops the current task without a countdown");
-            Check(c.Message.Contains("不会倒计时或自动重试"),"429 explains that retry has been disabled");
+            Check(c.Message.Contains("切换到不同 IP 成功后自动重试"),"429 explains the network-switch recovery path");
             int sends=p.Actions.FindAll(a=>a=="send").Count;now=now.AddMinutes(30);Steps(c,20);
             Check(p.Actions.FindAll(a=>a=="send").Count==sends,"stopped 429 never submits again after time passes");
             c.Resume();Steps(c,10);Check(!c.Running&&p.Actions.FindAll(a=>a=="send").Count==sends,"continue cannot restart a finished rate-limited round");
+            Check(c.CanRetryAfterNetworkChange&&c.RetryAfterNetworkChange(),"successful network change reopens only the rate-limited task");
+            Steps(c,4);Check(c.Running&&c.Attempt==1&&p.Actions.FindAll(a=>a=="send").Count==sends+1,"network recovery retries the failed submission exactly once");
+            Check(!c.RetryAfterNetworkChange(),"network recovery cannot duplicate a running retry");
             p=new FakePage();c=new RetryController(p,()=>now);c.Start("hello",0,false);Steps(c,3);p.V.conversation=p.V.generating=p.V.promptConfirmed=false;p.V.url="https://arena.ai/agent";p.V.rateLimitId=1;Steps(c,1);
             Check(!c.Running&&c.Finished&&c.CooldownSeconds==0,"429 without Retry-After also stops without a countdown");
             sends=p.Actions.FindAll(a=>a=="send").Count;now=now.AddMinutes(30);Steps(c,20);
             Check(p.Actions.FindAll(a=>a=="send").Count==sends,"429 without Retry-After never schedules a retry");
+            p=new FakePage();c=new RetryController(p);c.Start("hello",0,false);c.Pause("manual");
+            Check(!c.CanRetryAfterNetworkChange&&!c.RetryAfterNetworkChange(),"ordinary manual pause is never resumed by an IP switch");
         }
         static void UnlimitedRounds() {
             var now=DateTime.UtcNow;var p=new FakePage();var c=new RetryController(p,()=>now);

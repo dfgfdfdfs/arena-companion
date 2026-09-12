@@ -48,6 +48,7 @@ namespace ArenaCompanion {
 
         async Task<string> SwitchToNextIp() {
             if(switchingIp)return ipStatus.Text;
+            bool retryRateLimitedTask=controller!=null&&controller.CanRetryAfterNetworkChange;
             switchingIp=true;switchIp.Enabled=false;
             lastIpSwitchOk=false;
             string statePath=Path.Combine(InstanceContext.Root,"v2rayn-ip-cycle.txt");
@@ -79,7 +80,12 @@ namespace ArenaCompanion {
                         Directory.CreateDirectory(InstanceContext.Root);File.WriteAllText(statePath,target.ResolvedAddress,new UTF8Encoding(false));
                         ipStatus.Text="当前 IP："+(afterPublic==""?target.ResolvedAddress:afterPublic)+" · 节点 "+target.ResolvedAddress+" · 切换成功";
                         AddIpLog("从 "+beforeEndpoint+" 切换到 "+target.ResolvedAddress+(afterPublic==""?"；公网出口暂未读到":"；公网出口 "+afterPublic));
-                        lastIpSwitchOk=true;return ipStatus.Text;
+                        lastIpSwitchOk=true;
+                        if(retryRateLimitedTask&&controller.RetryAfterNetworkChange()) {
+                            browserTabs.SelectedIndex=0;
+                            AddIpLog("网络切换已确认，自动重试刚才因 429 停止的任务");
+                        }
+                        return ipStatus.Text;
                     } catch(Exception ex) {latest=ex;AddIpLog("节点 "+target.ResolvedAddress+" 切换未通过验证："+ex.Message);}
                 }
                 if(current!=null) {

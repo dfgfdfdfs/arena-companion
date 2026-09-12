@@ -77,7 +77,7 @@ namespace ArenaCompanion {
             adopt = useCurrent; expectedUrl = null; signature = null; sawGeneration = false;
             termsAttempted=termsWaiting=false;
             termsSubmissionPending=false;termsDraftSince=DateTime.MinValue;
-            seenRateLimit=0;RetryAt=null;
+            seenRateLimit=0;RetryAt=null;rateLimitPendingSubmission=false;
             readFailures=0;nextRead=DateTime.MinValue;
             WaitingForVerification=false;
             if(preparation!=null)preparation.BeginRound();
@@ -101,6 +101,18 @@ namespace ArenaCompanion {
             epoch++; Running = true; WaitingForVerification=false; until = clock().AddMinutes(2); phaseSince = clock();
             nextRead=DateTime.MinValue;
             Say("继续当前进度，不重复发送已提交的问题");
+        }
+        public bool CanRetryAfterNetworkChange {get {return !Running&&Finished&&Phase=="cooldown"&&!String.IsNullOrWhiteSpace(Prompt);}}
+        public bool RetryAfterNetworkChange() {
+            if(busy)throw new InvalidOperationException("上一操作仍在结束，请稍后重试");
+            if(!CanRetryAfterNetworkChange)return false;
+            epoch++;Running=true;Finished=false;CandidateReady=false;CandidateUrl=null;WaitingForVerification=false;
+            if(rateLimitPendingSubmission&&Attempt>0)Attempt--;
+            rateLimitPendingSubmission=false;RetryAt=null;adopt=false;expectedUrl=null;signature=null;sawGeneration=false;
+            termsAttempted=termsWaiting=termsSubmissionPending=false;termsDraftSince=DateTime.MinValue;
+            readFailures=0;nextRead=DateTime.MinValue;
+            if(preparation!=null)preparation.BeginRound();
+            Move("inspect");Say("IP 切换成功，正在自动重试刚才的任务");return true;
         }
         void Done(string message) { Finished = true; Running = false; Say(message); }
         bool LimitReached {get {return Limit > 0 && Attempt >= Limit;}}

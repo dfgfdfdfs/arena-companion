@@ -81,7 +81,7 @@ namespace ArenaCompanion {
                 var controller=new RetryController(page,null,new AttachmentUpload(view));controller.Start("hello",1,false);DateTime deadline=DateTime.UtcNow.AddSeconds(15);
                 while(DateTime.UtcNow<deadline&&controller.Running){await controller.Tick();await Task.Delay(100);}
                 Check(!controller.Running&&controller.Finished&&controller.Phase=="cooldown","native 429 stops the active browser task");
-                Check(controller.CooldownSeconds==0&&controller.Message.Contains("不会倒计时或自动重试"),"native 429 exposes no countdown or retry schedule");
+                Check(controller.CooldownSeconds==0&&controller.Message.Contains("切换到不同 IP 成功后自动重试"),"native 429 exposes the network-switch recovery path without a countdown");
                 int stoppedRequests=requests;await Task.Delay(6500);for(int i=0;i<10;i++)await controller.Tick();
                 Check(stoppedRequests==1&&requests==1,"native 429 produces exactly one request and never retries after five seconds");
                 var state=await page.Read("hello");

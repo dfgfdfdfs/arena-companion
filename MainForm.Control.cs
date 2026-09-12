@@ -72,7 +72,7 @@ namespace ArenaCompanion {
             browserTabs.SelectedIndex=1;
             if(rateLimitSignalHandled)return;
             rateLimitSignalHandled=true;
-            switchIp.PerformClick();
+            rateLimitTest.PerformClick();
         }
         void NavigatePopup(string url) {
             Uri uri;
