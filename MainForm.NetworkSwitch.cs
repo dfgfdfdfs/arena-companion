@@ -53,13 +53,13 @@ namespace ArenaCompanion {
                 V2rayNControlClient client=await V2rayNControlClient.Discover();
                 V2rayNSnapshot snapshot=await client.ReadProfiles();
                 List<string> recent=IpCycle.ParseRecent(File.Exists(statePath)?File.ReadAllText(statePath):"");
-                ipStatus.Text="正在解析服务器 IP、核对地区并选择最低延迟节点…";
+                ipStatus.Text="正在解析服务器 IP、核对地区并优先选择日本节点…";
                 var targets=await IpCycle.SelectTargets(snapshot,recent);
                 V2rayNNode current=IpCycle.Current(snapshot);
                 string beforeEndpoint=current==null?"未知":(String.IsNullOrEmpty(current.ResolvedAddress)?current.Address:current.ResolvedAddress);
                 string beforePublic=await PublicIpReader.Read();
                 Exception latest=null;
-                if(targets.Count==0)throw new InvalidOperationException("没有满足条件的节点：必须是非中国大陆、不同于当前 IP，并且最近 4 次内未使用；地区无法确认的节点不会冒充可用节点");
+                if(targets.Count==0)throw new InvalidOperationException("没有满足条件的节点：排除中国大陆、香港、台湾、美国、当前 IP 和最近 4 次已用 IP；地区无法确认的节点不会冒充可用节点");
                 foreach(V2rayNNode target in targets) {
                     try {
                         ipStatus.Text="当前 "+beforeEndpoint+" · 正在切换到 "+target.ResolvedAddress+"（"+target.CountryCode+"，"+(target.Delay>0?target.Delay+" ms":"延迟未测")+"）";

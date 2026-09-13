@@ -54,10 +54,11 @@ namespace ArenaCompanion {
             foreach(V2rayNNode node in candidates) {
                 string country;
                 node.CountryCode=countries.TryGetValue(node.ResolvedAddress,out country)?(country??"").Trim().ToUpperInvariant():"";
-                if(node.CountryCode=="CN"||node.CountryCode.Length!=2)continue;
+                if(node.CountryCode.Length!=2||node.CountryCode=="CN"||node.CountryCode=="HK"||node.CountryCode=="TW"||node.CountryCode=="US")continue;
                 eligible.Add(node);
             }
-            return eligible.OrderBy(n=>n.Delay>0?0:1)
+            return eligible.OrderBy(n=>n.CountryCode=="JP"?0:1)
+                .ThenBy(n=>n.Delay>0?0:1)
                 .ThenBy(n=>n.Delay>0?n.Delay:Int32.MaxValue)
                 .ThenBy(n=>n.ResolvedAddress,StringComparer.OrdinalIgnoreCase).ToList();
         }
