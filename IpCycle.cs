@@ -95,10 +95,10 @@ namespace ArenaCompanion {
             var addresses=(values??new string[0]).Select(value=>{IPAddress parsed;return IPAddress.TryParse(value,out parsed)?parsed.ToString():"";})
                 .Where(value=>value!="").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             var countries=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-            for(int offset=0;offset<addresses.Length;offset+=100) {
-                Dictionary<string,string> batch=await ReadBatch(addresses.Skip(offset).Take(100).ToArray());
-                foreach(var pair in batch)countries[pair.Key]=pair.Value;
-            }
+            Task<Dictionary<string,string>>[] requests=Enumerable.Range(0,(addresses.Length+99)/100)
+                .Select(batch=>ReadBatch(addresses.Skip(batch*100).Take(100).ToArray())).ToArray();
+            foreach(Dictionary<string,string> result in await Task.WhenAll(requests))
+                foreach(var pair in result)countries[pair.Key]=pair.Value;
             return countries;
         }
 
