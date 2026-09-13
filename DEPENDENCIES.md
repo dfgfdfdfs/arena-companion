@@ -30,6 +30,8 @@
 
 `build-v2rayn-bridge.ps1` 从官方仓库获取固定版本、应用 `v2rayn-bridge` 中的补丁并构建独立控制版。这个过程不读取或修改用户正在运行的 v2rayN 目录。
 
+运行时的非中国大陆节点筛选使用无需密钥的 `https://api.country.is/`。软件只提交 v2rayN 节点解析出的服务器 IP，并按接口规定每批最多查询 100 个；不提交订阅地址、UUID、密码或账号数据。
+
 ## 窗体与资源
 
 项目没有 Visual Studio Designer 生成的 `.Designer.cs` 或 `.resx`。所有 WinForms 窗体与控件直接在 C# 文件中创建：

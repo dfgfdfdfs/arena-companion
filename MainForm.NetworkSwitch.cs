@@ -31,16 +31,12 @@ namespace ArenaCompanion {
                 V2rayNControlClient client=await V2rayNControlClient.Discover();
                 V2rayNSnapshot snapshot=await client.ReadProfiles();
                 string statePath=Path.Combine(InstanceContext.Root,"v2rayn-ip-cycle.txt");
-                string last=File.Exists(statePath)?File.ReadAllText(statePath).Trim():"";
-                List<V2rayNNode> targets=await IpCycle.DistinctTargets(snapshot,last);
-                V2rayNNode current=snapshot.Nodes.FirstOrDefault(n=>n.Current||n.IndexId==snapshot.CurrentIndexId);
-                V2rayNNode next=targets.FirstOrDefault();
+                List<string> recent=IpCycle.ParseRecent(File.Exists(statePath)?File.ReadAllText(statePath):"");
+                List<V2rayNNode> distinct=IpCycle.DistinctConfiguredNodes(snapshot);
+                V2rayNNode current=IpCycle.Current(snapshot);
                 string publicIp=await PublicIpReader.Read();
-                var distinct=snapshot.Nodes.GroupBy(n=>n.ResolvedAddress,StringComparer.OrdinalIgnoreCase)
-                    .Select(g=>g.OrderBy(n=>n.Delay>0?0:1).ThenBy(n=>n.Delay>0?n.Delay:Int32.MaxValue).First()).ToList();
                 int currentPosition=current==null?-1:distinct.FindIndex(n=>String.Equals(n.ResolvedAddress,current.ResolvedAddress,StringComparison.OrdinalIgnoreCase));
-                int nextPosition=next==null?-1:distinct.FindIndex(n=>String.Equals(n.ResolvedAddress,next.ResolvedAddress,StringComparison.OrdinalIgnoreCase));
-                ipStatus.Text=NetworkStatusFormatter.Format(publicIp,current,next,currentPosition,nextPosition,snapshot.Nodes.Count,distinct.Count,DateTime.Now);
+                ipStatus.Text=NetworkStatusFormatter.Format(publicIp,current,currentPosition,snapshot.Nodes.Count,distinct.Count,recent.Count,DateTime.Now);
             } catch(Exception ex) {
                 ipStatus.Text="网络信息读取失败："+ex.Message+Environment.NewLine+"只读刷新会在 5 秒后重试；当前代理不会被切换。";
             } finally {refreshingNetwork=false;}
@@ -56,15 +52,17 @@ namespace ArenaCompanion {
                 ipStatus.Text="正在实时读取 v2rayN 节点…";
                 V2rayNControlClient client=await V2rayNControlClient.Discover();
                 V2rayNSnapshot snapshot=await client.ReadProfiles();
-                string last=File.Exists(statePath)?File.ReadAllText(statePath).Trim():"";
-                var targets=await IpCycle.DistinctTargets(snapshot,last);
-                V2rayNNode current=snapshot.Nodes.FirstOrDefault(n=>n.Current||n.IndexId==snapshot.CurrentIndexId);
+                List<string> recent=IpCycle.ParseRecent(File.Exists(statePath)?File.ReadAllText(statePath):"");
+                ipStatus.Text="正在解析服务器 IP、核对地区并选择最低延迟节点…";
+                var targets=await IpCycle.SelectTargets(snapshot,recent);
+                V2rayNNode current=IpCycle.Current(snapshot);
                 string beforeEndpoint=current==null?"未知":(String.IsNullOrEmpty(current.ResolvedAddress)?current.Address:current.ResolvedAddress);
                 string beforePublic=await PublicIpReader.Read();
                 Exception latest=null;
+                if(targets.Count==0)throw new InvalidOperationException("没有满足条件的节点：必须是非中国大陆、不同于当前 IP，并且最近 4 次内未使用；地区无法确认的节点不会冒充可用节点");
                 foreach(V2rayNNode target in targets) {
                     try {
-                        ipStatus.Text="当前 "+beforeEndpoint+" · 正在切换到 "+target.ResolvedAddress;
+                        ipStatus.Text="当前 "+beforeEndpoint+" · 正在切换到 "+target.ResolvedAddress+"（"+target.CountryCode+"，"+(target.Delay>0?target.Delay+" ms":"延迟未测")+"）";
                         await client.Activate(target.IndexId);
                         string afterPublic="";
                         for(int attempt=0;attempt<5&&afterPublic=="";attempt++) {
@@ -77,9 +75,10 @@ namespace ArenaCompanion {
                             latest=new InvalidOperationException("节点 "+target.ResolvedAddress+" 的公网出口仍是 "+afterPublic);
                             continue;
                         }
-                        Directory.CreateDirectory(InstanceContext.Root);File.WriteAllText(statePath,target.ResolvedAddress,new UTF8Encoding(false));
-                        ipStatus.Text="当前 IP："+(afterPublic==""?target.ResolvedAddress:afterPublic)+" · 节点 "+target.ResolvedAddress+" · 切换成功";
-                        AddIpLog("从 "+beforeEndpoint+" 切换到 "+target.ResolvedAddress+(afterPublic==""?"；公网出口暂未读到":"；公网出口 "+afterPublic));
+                        recent=IpCycle.RecordSuccess(recent,target.ResolvedAddress);
+                        Directory.CreateDirectory(InstanceContext.Root);File.WriteAllLines(statePath,recent,new UTF8Encoding(false));
+                        ipStatus.Text="当前 IP："+(afterPublic==""?target.ResolvedAddress:afterPublic)+" · 节点 "+target.ResolvedAddress+"（"+target.CountryCode+"，"+(target.Delay>0?target.Delay+" ms":"延迟未测")+"）· 切换成功";
+                        AddIpLog("从 "+beforeEndpoint+" 切换到 "+target.ResolvedAddress+"（"+target.CountryCode+"，"+(target.Delay>0?target.Delay+" ms":"延迟未测")+"）"+(afterPublic==""?"；公网出口暂未读到":"；公网出口 "+afterPublic));
                         lastIpSwitchOk=true;
                         if(retryRateLimitedTask&&controller.RetryAfterNetworkChange()) {
                             browserTabs.SelectedIndex=0;

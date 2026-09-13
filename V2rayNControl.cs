@@ -16,6 +16,7 @@ namespace ArenaCompanion {
         public string Type;
         public string Address;
         public string ResolvedAddress;
+        public string CountryCode;
         public int Port;
         public int Delay;
         public bool Current;

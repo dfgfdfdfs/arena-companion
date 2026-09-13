@@ -2,13 +2,12 @@ using System;
 
 namespace ArenaCompanion {
     public static class NetworkStatusFormatter {
-        public static string Format(string publicIp,V2rayNNode current,V2rayNNode next,int currentPosition,int nextPosition,int nodeCount,int distinctCount,DateTime now) {
+        public static string Format(string publicIp,V2rayNNode current,int currentPosition,int nodeCount,int distinctCount,int recentCount,DateTime now) {
             string currentIp=current==null?"未知":Endpoint(current);
-            string nextIp=next==null?"暂无":Endpoint(next);
             return "当前公网 IP："+(String.IsNullOrEmpty(publicIp)?"暂未读到（节点信息正常）":publicIp)+"    每 5 秒刷新 · "+now.ToString("HH:mm:ss")+Environment.NewLine+
                 "当前节点："+Name(current)+" | "+Protocol(current)+" | "+currentIp+Port(current)+" | "+Delay(current)+Environment.NewLine+
-                "下一个待切换："+Name(next)+" | "+Protocol(next)+" | "+nextIp+Port(next)+" | "+Delay(next)+Environment.NewLine+
-                "轮换位置：当前 "+Position(currentPosition,distinctCount)+" → 下次 "+Position(nextPosition,distinctCount)+" | 共 "+nodeCount+" 个节点 / "+distinctCount+" 个不同 IP";
+                "下一个待切换：点击时实时核对地区和延迟，不提前指定"+Environment.NewLine+
+                "选择规则：非中国大陆 | 最近 4 次不重复（已记录 "+recentCount+"）| 优先最低延迟 | 当前 "+Position(currentPosition,distinctCount)+" | 共 "+nodeCount+" 个节点 / "+distinctCount+" 个不同地址（点击时按 IP 去重）";
         }
         static string Endpoint(V2rayNNode node) {return String.IsNullOrEmpty(node.ResolvedAddress)?node.Address:node.ResolvedAddress;}
         static string Name(V2rayNNode node) {return node==null||String.IsNullOrWhiteSpace(node.Name)?"未命名节点":node.Name;}
