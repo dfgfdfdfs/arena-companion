@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Collections.Generic;
@@ -30,6 +31,12 @@ namespace ArenaCompanion {
         }
         public async Task<string> DownloadHtml(string name) {
             await Action("file",name);await Task.Delay(600);
+            var inline=(Dictionary<string,object>)await Action("html",name);
+            string inlineHtml=Convert.ToString(inline["html"]);
+            if(!String.IsNullOrWhiteSpace(inlineHtml)) {
+                if(Encoding.UTF8.GetByteCount(inlineHtml)>1900000)throw new InvalidOperationException("HTML 超过当前渲染容量，未生成不完整截图");
+                return inlineHtml;
+            }
             string temporary=Path.Combine(Path.GetTempPath(),"arena-preview-"+Guid.NewGuid().ToString("N")+".html");
             var completion=new TaskCompletionSource<string>();CoreWebView2DownloadOperation download=null;
             EventHandler<CoreWebView2DownloadStartingEventArgs> handler=(s,e)=>{

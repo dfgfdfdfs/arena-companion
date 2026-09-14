@@ -34,6 +34,13 @@
    const b=[...new Set(entries.length?entries:button(value))];
    if(!isHtml(value)||b.length!==1)throw Error('未找到唯一匹配的 HTML 文件：'+value);b[0].click();return {ok:true};
   }
+  if(action==='html'){
+   if(!isHtml(value))throw Error('不是 HTML 文件：'+value);
+   if(previewName()!==value)return {html:''};
+   const frames=all('iframe[title="File preview"]').filter(e=>e.srcdoc&&e.srcdoc.trim());
+   if(frames.length>1)throw Error('HTML 源码预览不唯一');
+   return {html:frames.length===1?frames[0].srcdoc:''};
+  }
   if(action==='openHtmlArtifact'){
    const b=[...new Set([...all('[role=log] button').filter(e=>/^(查看\s*HTML\s*文件|View HTML file)$/i.test(label(e))),...openFiles().map(e=>e.button)])];
    if(b.length!==1)throw Error('这条回答尚未找到唯一的 HTML 文件入口');b[0].click();return {ok:true};

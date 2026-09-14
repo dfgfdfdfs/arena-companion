@@ -4,7 +4,7 @@
 <script>
 history.replaceState(null,'','/agent/11111111-1111-4111-8111-111111111111');
 let selected='sample.html';document.querySelectorAll('.file').forEach(b=>b.onclick=()=>selected=b.textContent);
-document.getElementById('download').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<!doctype html><style>body{background:#245f51;color:white;font:32px sans-serif;display:grid;place-content:center;height:90vh}</style><h1>Collected '+selected+'</h1>'],{type:'text/html'}));a.download=selected;a.click();};
+document.getElementById('download').onclick=()=>{window.downloadClicks=(window.downloadClicks||0)+1;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['<!doctype html><style>body{background:#245f51;color:white;font:32px sans-serif;display:grid;place-content:center;height:90vh}</style><h1>Collected '+selected+'</h1>'],{type:'text/html'}));a.download=selected;a.click();};
 window.captionedArtifact=()=>{
  document.querySelectorAll('.file')[1].remove();const b=document.querySelector('.file');b.textContent='查看 HTML 文件';
  b.onclick=()=>{selected='sample.html';if(document.getElementById('switch'))return;const s=document.createElement('button');s.id='switch';s.setAttribute('aria-label','Switch file');s.textContent='sample.html';document.querySelector('main').append(s);const f=document.createElement('iframe');f.title='HTML preview';document.querySelector('main').append(f);};
@@ -15,7 +15,7 @@ window.dualPreviewArtifact=()=>{
  row.innerHTML='<span>Write <span>sample.html</span></span><button aria-label="Open file">open</button>';
  document.querySelector('[role=log]').append(row);
  row.querySelector('button').onclick=()=>{selected='sample.html';document.getElementById('switch').textContent=selected;window.openClicks=(window.openClicks||0)+1;};
- const inline=document.createElement('iframe');inline.title='File preview';inline.srcdoc='<h1>Inline preview</h1>';document.querySelector('[role=log]').append(inline);
+ const inline=document.createElement('iframe');inline.title='File preview';inline.srcdoc='<!doctype html><style>body{background:#713f61;color:white}</style><h1>Inline preview source</h1>';document.querySelector('[role=log]').append(inline);
 };
 window.closedPreviewArtifact=()=>{
  document.querySelectorAll('iframe').forEach(e=>e.remove());document.getElementById('switch').remove();

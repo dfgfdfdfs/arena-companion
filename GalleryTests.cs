@@ -109,7 +109,8 @@ namespace ArenaCompanion {
                 var dualCollector=new CandidateCollector(dualStore,cp,new HtmlImageRenderer(Path.Combine(root,"dual-renderer")));
                 var dualRecord=await dualCollector.Collect(url,"fixture-profile","local@example.invalid","local test",()=>Task.FromResult(0));
                 Check(dualRecord.Renamed&&dualRecord.Images.Count==1&&dualRecord.Images[0].Name=="sample.html","inline and workspace previews coexist without losing the HTML filename");
-                Check(await view.CoreWebView2.ExecuteScriptAsync("window.openClicks||0")=="0","already-open matching preview is downloaded without clicking another artifact");
+                Check(await view.CoreWebView2.ExecuteScriptAsync("window.openClicks||0")=="0","already-open matching preview is read without clicking another artifact");
+                Check(await view.CoreWebView2.ExecuteScriptAsync("window.downloadClicks||0")=="4","matching File preview srcdoc is read directly without starting another download");
                 await view.CoreWebView2.ExecuteScriptAsync("window.closedPreviewArtifact()");
                 var openStore=new CandidateStore(Path.Combine(root,"open-file-fixture"));
                 var openCollector=new CandidateCollector(openStore,cp,new HtmlImageRenderer(Path.Combine(root,"open-renderer")));
