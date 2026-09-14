@@ -8,8 +8,12 @@ namespace ArenaCompanion {
     static class Program {
         [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
         [STAThread] static void Main(string[] args) {
-            if(args.Length==2&&args[0]=="--saved") {
-                try {SetProcessDPIAware();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new SavedConversationWindow(args[1]));}
+            int savedOption=Array.IndexOf(args,"--saved"),savedRootOption=Array.IndexOf(args,"--saved-root"),savedIdOption=Array.IndexOf(args,"--saved-id");
+            if((savedOption>=0&&savedOption+1<args.Length)||(savedRootOption>=0&&savedRootOption+1<args.Length&&savedIdOption>=0&&savedIdOption+1<args.Length)) {
+                try {
+                    string folder=savedOption>=0?SavedConversationStore.ResolveLegacyFolder(args[savedOption+1]):SavedConversationStore.ResolveById(args[savedRootOption+1],args[savedIdOption+1]);
+                    SetProcessDPIAware();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new SavedConversationWindow(folder));
+                }
                 catch(Exception ex){MessageBox.Show("无法打开保存的对话："+ex.Message,"Arena 对话入口");}
                 return;
             }
