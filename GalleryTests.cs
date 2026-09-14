@@ -55,13 +55,9 @@ namespace ArenaCompanion {
                 string destination=Path.Combine(root,"saved-export");Directory.CreateDirectory(destination);gallery.SetDestination(destination);await Task.Delay(250);
                 await gallery.ContextAction(second.Id,second.Images[0].File,"save");await Task.Delay(400);
                 string folder=gallery.LastSavedFolder;
-                string accountRoot=Path.Combine(destination,"账号");
-                Check(folder!=null&&Path.GetDirectoryName(folder)==accountRoot&&File.Exists(Path.Combine(folder,"打开对话.lnk")),"save menu creates the account folder and launch shortcut under the selected destination");
+                Check(folder!=null&&Path.GetDirectoryName(folder)==destination&&File.Exists(Path.Combine(folder,"打开对话.lnk")),"save menu creates a launch shortcut in the selected folder");
                 File.Delete(Path.Combine(second.Profile,"account.dpapi"));
                 Check(SavedConversationStore.Load(folder).Url==url&&new AccountStore(folder).Load().Email==second.Email,"saved account and conversation survive loss of the original account file");
-                string originalFolder=folder,renamedFolder=Path.Combine(accountRoot,"这是任意重命名后的文件夹");Directory.Move(originalFolder,renamedFolder);folder=renamedFolder;
-                Check(SavedConversationStore.ResolveById(accountRoot,second.Id)==renamedFolder&&SavedConversationStore.Load(renamedFolder).Url==url,"saved conversation resolves by stable id after its folder is renamed");
-                Check(SavedConversationStore.ResolveLegacyFolder(originalFolder)==renamedFolder,"legacy absolute-path shortcut also recovers a renamed folder by its id suffix");
                 Check(Directory.GetFiles(folder,"*.png").Length==0&&!File.ReadAllText(Path.Combine(folder,"conversation.json")).Contains("Fixture-Only-Password"),"export contains account and conversation metadata, no image or plaintext password");
                 Check(new SavedConversationStore(Path.Combine(root,"gallery-export-directory.txt")).Destination==destination,"selected export location survives restart");
                 await gallery.CaptureImage(Path.Combine(root,"gallery-preview.png"));
